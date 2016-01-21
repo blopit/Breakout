@@ -8,6 +8,7 @@ import java.util.Arrays;
 import javax.swing.*;
 
 import java.lang.*;
+import java.awt.geom.FlatteningPathIterator;
 
 public class Game extends JPanel implements Runnable {
 	private static final long serialVersionUID = -9L;
@@ -41,17 +42,18 @@ public class Game extends JPanel implements Runnable {
 	}
 
 	private float dist(double d, double e, double camx2, double camy2) {
-		return (float) Math.sqrt(Math.pow(camx2-d,2) + Math.pow(camy2-e,2));
+		return (float) Math.sqrt(Math.pow(camx2 - d, 2)
+				+ Math.pow(camy2 - e, 2));
 	}
-	
-	private boolean collisionRectRect(double AX1, double AY1, double AX2, double AY2,
-			double BX1, double BY1, double BX2, double BY2) {
+
+	private boolean collisionRectRect(double AX1, double AY1, double AX2,
+			double AY2, double BX1, double BY1, double BX2, double BY2) {
 		return (AX1 < BX2 && AX2 > BX1 && AY1 < BY2 && AY2 > BY1);
 	}
 
-	private boolean collisionCircleLine(double circleCenterX, double circleCenterY,
-			double circleRadius, double lineAX, double lineAY, double lineBX,
-			double lineBY) {
+	private boolean collisionCircleLine(double circleCenterX,
+			double circleCenterY, double circleRadius, double lineAX,
+			double lineAY, double lineBX, double lineBY) {
 
 		/*
 		 * if
@@ -99,30 +101,36 @@ public class Game extends JPanel implements Runnable {
 		private int BX;
 		private int BY;
 		private Block rect;
+
 		private class Point {
-			   double x;
-			   double y;
-			   public Point(double d, double e){
-				   this.x = d;
-				   this.y = e;
-			   }
+			double x;
+			double y;
+
+			public Point(double d, double e) {
+				this.x = d;
+				this.y = e;
+			}
 		}
+
 		public Line(Block r, int ax, int ay, int bx, int by) {
-			
-			Point A = rotateAbout(new Point(ax,ay),new Point(r.x+r.width/2,r.y+r.height/2),r.angle);
-			Point B = rotateAbout(new Point(bx,by),new Point(r.x+r.width/2,r.y+r.height/2),r.angle);
-			
+
+			Point A = rotateAbout(new Point(ax, ay), new Point(r.x + r.width
+					/ 2, r.y + r.height / 2), r.angle);
+			Point B = rotateAbout(new Point(bx, by), new Point(r.x + r.width
+					/ 2, r.y + r.height / 2), r.angle);
+
 			AX = (int) A.x;
 			AY = (int) A.y;
 			BX = (int) B.x;
 			BY = (int) B.y;
 			rect = r;
 		}
-		private Point rotateAbout(Point p, Point c, double theta){
+
+		private Point rotateAbout(Point p, Point c, double theta) {
 			double tempX = p.x - c.x;
 			double tempY = p.y - c.y;
-			double rotatedX = tempX*Math.cos(theta) - tempY*Math.sin(theta);
-			double rotatedY = tempX*Math.sin(theta) + tempY*Math.cos(theta);
+			double rotatedX = tempX * Math.cos(theta) - tempY * Math.sin(theta);
+			double rotatedY = tempX * Math.sin(theta) + tempY * Math.cos(theta);
 			tempX = rotatedX + c.x;
 			tempY = rotatedY + c.y;
 			return new Point(tempX, tempY);
@@ -135,7 +143,7 @@ public class Game extends JPanel implements Runnable {
 		protected int width;
 		protected int height;
 		protected double angle;
-		
+
 		public Rect(int x, int y, int width, int height) {
 			this.x = x;
 			this.y = y;
@@ -143,7 +151,7 @@ public class Game extends JPanel implements Runnable {
 			this.height = height;
 			this.angle = 0;
 		}
-		
+
 		public Rect(int x, int y, int width, int height, double a) {
 			this.x = x;
 			this.y = y;
@@ -156,31 +164,33 @@ public class Game extends JPanel implements Runnable {
 	private class Block extends Rect {
 		private int hp;
 		protected Line[] lines;
-		
+
 		public int minX = this.x;
-		public int maxX = this.x+this.width;
+		public int maxX = this.x + this.width;
 		public int minY = this.y;
-		public int maxY = this.y+this.height;
-		
-		public void hit(){
+		public int maxY = this.y + this.height;
+
+		public void hit() {
 			this.hp--;
-			if (this.hp <= 0){
+			if (this.hp <= 0) {
 				blockList.remove(this);
 			}
+			ball.xsp*=1.1;
+			ball.ysp*=1.1;
 		}
-		
+
 		public Block(int x, int y, int width, int height, int hp, double a) {
 			super(x, y, width, height, a);
 			this.hp = hp;
 			this.lines = new Line[] {
 					new Line(this, this.x, this.y, this.x + this.width, this.y),
-					new Line(this,this.x + this.width, this.y, this.x + this.width,
-							this.y + this.height),
-					new Line(this,this.x + this.width, this.y + this.height, this.x,
-							this.y + this.height),
-					new Line(this,this.x, this.y + this.height, this.x, this.y)};
-			
-			for (Line l: this.lines){
+					new Line(this, this.x + this.width, this.y, this.x
+							+ this.width, this.y + this.height),
+					new Line(this, this.x + this.width, this.y + this.height,
+							this.x, this.y + this.height),
+					new Line(this, this.x, this.y + this.height, this.x, this.y) };
+
+			for (Line l : this.lines) {
 				if (l.AX < this.minX)
 					this.minX = l.AX;
 				else if (l.AX > this.maxX)
@@ -190,6 +200,28 @@ public class Game extends JPanel implements Runnable {
 				else if (l.AY > this.maxY)
 					this.maxY = l.AY;
 			}
+		}
+
+		public Block(int x1, int y1, int x2, int y2, int x3, int y3, int x4,
+				int y4, int hp) {
+			super(x1, y1, 1, 1, 0);
+			this.hp = hp;
+			this.lines = new Line[] { new Line(this, x1, y1, x2, y2),
+					new Line(this, x2, y2, x3, y3),
+					new Line(this, x3, y3, x4, y4),
+					new Line(this, x4, y4, x1, y1) };
+
+			for (Line l : this.lines) {
+				if (l.AX < this.minX)
+					this.minX = l.AX;
+				else if (l.AX > this.maxX)
+					this.maxX = l.AX;
+				if (l.AY < this.minY)
+					this.minY = l.AY;
+				else if (l.AY > this.maxY)
+					this.maxY = l.AY;
+			}
+
 		}
 	}
 
@@ -210,7 +242,7 @@ public class Game extends JPanel implements Runnable {
 			}
 		}
 	}
-	
+
 	private class Ball {
 		private double x;
 		private double y;
@@ -226,25 +258,25 @@ public class Game extends JPanel implements Runnable {
 			this.xsp = 3;
 			this.ysp = -4;
 		}
-		
-		private void transformDirection(double N){
-			double c_speed = dist(0,0,this.xsp,this.ysp);
-			double c_angle = Math.atan2(this.ysp,this.xsp);
-			double e_angle = 2*N-c_angle-Math.PI;
-			
-			this.xsp = c_speed*Math.cos(e_angle);
-			this.ysp = c_speed*Math.sin(e_angle);
-			
+
+		private void transformDirection(double N) {
+			double c_speed = dist(0, 0, this.xsp, this.ysp);
+			double c_angle = Math.atan2(this.ysp, this.xsp);
+			double e_angle = 2 * N - c_angle - Math.PI;
+
+			this.xsp = c_speed * Math.cos(e_angle);
+			this.ysp = c_speed * Math.sin(e_angle);
+
 		}
-		
-		private void setDirection(double N){
-			double c_speed = dist(0,0,this.xsp,this.ysp);
+
+		private void setDirection(double N) {
+			double c_speed = dist(0, 0, this.xsp, this.ysp);
 			double e_angle = N;
-			
-			this.xsp = c_speed*Math.cos(e_angle);
-			this.ysp = c_speed*Math.sin(e_angle);
+
+			this.xsp = c_speed * Math.cos(e_angle);
+			this.ysp = c_speed * Math.sin(e_angle);
 		}
-		
+
 		private Line checkPlace(double cx, double cy) {
 			for (Block b : blockList) {
 				if (collisionRectRect(this.x - this.radius + cx, this.y
@@ -260,85 +292,54 @@ public class Game extends JPanel implements Runnable {
 			}
 			return null;
 		}
-		
-		private void bounce(Line l){
-			transformDirection(-Math.PI/2+Math.atan2(l.BY-l.AY, l.BX-l.AX));
+
+		private void bounce(Line l) {
+			transformDirection(-Math.PI / 2
+					+ Math.atan2(l.BY - l.AY, l.BX - l.AX));
 			l.rect.hit();
 		}
 
 		private void update() {
+			if (Math.abs(ysp) < 1) {
+				ysp = Math.signum(ysp);
+			}
+
 			if (collisionCircleLine(ball.x, ball.y, ball.radius, paddle.x,
 					paddle.y, paddle.x + paddle.width, paddle.y)) {
-				//transformDirection;
-				setDirection((-90+60*(ball.x-(paddle.x+paddle.width/2))/paddle.width)*Math.PI/180);
+				// transformDirection;
+				setDirection((-90 + 60
+						* (ball.x - (paddle.x + paddle.width / 2))
+						/ paddle.width)
+						* Math.PI / 180);
 			}
 
 			if (this.x + this.radius > screen_width && this.xsp > 0) {
+				this.x = screen_width - this.radius;
 				this.xsp *= -1;
 			} else if (this.x - this.radius < 0 && this.xsp < 0) {
+				this.x = this.radius;
 				this.xsp *= -1;
 			} else if (this.y - this.radius < 0 && this.ysp < 0) {
+				this.y = this.radius;
 				this.ysp *= -1;
 			} else if (this.y + this.radius > screen_height && this.ysp > 0) {
 				// game over
+				this.ysp *= -1;
 			}
-			
+
 			Line tempL = null;
-			int mult = 1;
-			
-			for (int i=0;i<mult;i++)
-			{
-				tempL = checkPlace(xsp/mult, ysp/mult);
+			int mult = (int) dist(0,0,this.xsp,this.ysp);
+
+			for (int i = 0; i < mult; i++) {
+				tempL = checkPlace(xsp / mult, ysp / mult);
 				if (tempL != null) {
 					bounce(tempL);
-				}else{
-					x+=xsp/mult;
-					y+=ysp/mult;
+				} else {
+					x += xsp / mult;
+					y += ysp / mult;
 				}
 			}
 			
-			
-			/*int mult = 1;
-			Line tempL = null;
-			if (this.xsp > 0) {
-				for (int i = 0; i < this.xsp*mult; i++) {
-					tempL = checkPlace(1.0/mult, 0);
-					if (tempL != null) {
-						bounce(tempL);
-						break;
-					}
-					this.x+=1/mult;
-				}
-			} else if (this.xsp < 0) {
-				for (int i = 0; i < -this.xsp*mult; i++) {
-					tempL = checkPlace(-1.0/mult, 0);
-					if (tempL != null) {
-						bounce(tempL);
-						break;
-					}
-					this.x-=1/mult;
-				}
-			}
-			if (this.ysp > 0) {
-				for (int i = 0; i < this.ysp*mult; i++) {
-					tempL = checkPlace(0, 1.0/mult);
-					if (tempL != null) {
-						bounce(tempL);
-						break;
-					}
-					this.y+=1/mult;
-				}
-			} else if (this.ysp < 0) {
-				for (int i = 0; i < -this.ysp*mult; i++) {
-					tempL = checkPlace(0, -1.0/mult);
-					if (tempL != null) {
-						bounce(tempL);
-						break;
-					}
-					this.y-=1/mult;
-				}
-			}*/
-
 		}
 	}
 
@@ -362,11 +363,63 @@ public class Game extends JPanel implements Runnable {
 		ball = new Ball(128, 500);
 		paddle = new Paddle(256, 540, 64, 8);
 
-		for (int j = 1; j < 3; j++) {
-			for (int i = 0; i < 10; i++) {
-				Block block = new Block(32 + i * 64, 32 + j * 65, 64, 64, j , (25*Math.sin((0.0+i*50.0)/180*Math.PI)/180)*Math.PI);
-				blockList.add(block);
+		Path2D.Double path = new Path2D.Double();
+		path.moveTo(100, 100);
+		path.quadTo(/* 100, 100, */400, 200, 700, 100);
+		path.quadTo(/* 700, 300, */550, 300, 400, 200);
+		path.quadTo(/* 400, 200, */250, 100, 100, 300);
+		path.quadTo(/* 100, 300, */400, 400, 700, 300);
+
+		// path.quadTo(/*100, 300,*/ 250, 300, 400, 300);
+
+		AffineTransform at = new AffineTransform();
+		int cx = 40;
+		int cy = 60;
+
+		int pinx1 = 0;
+		int piny1 = 0;
+		int pinx2 = 0;
+		int piny2 = 0;
+		double pin = 0;
+
+		FlatteningPathIterator fpi = new FlatteningPathIterator(
+				path.getPathIterator(at), 4);
+		PathIterator pi = fpi;// path.getPathIterator(at);
+		int segnumber = 0;
+		while (pi.isDone() == false) {
+			segnumber++;
+			float[] coords = new float[6];
+			pi.currentSegment(coords);
+			double angle = (Math.atan2(coords[1] - cy, coords[0] - cx));
+			double wid = 8;
+
+			int tx1 = (int) (coords[0] + wid * Math.cos(angle + Math.PI / 2));
+			int ty1 = (int) (coords[1] + wid * Math.sin(angle + Math.PI / 2));
+			int tx2 = (int) (coords[0] + wid * Math.cos(angle - Math.PI / 2));
+			int ty2 = (int) (coords[1] + wid * Math.sin(angle - Math.PI / 2));
+
+			Block block = null;
+			if (pinx1 == 0 && piny1 == 0) {
+				block = new Block((int) (cx + wid
+						* Math.cos(angle + Math.PI / 2)), (int) (cy + wid
+						* Math.sin(angle + Math.PI / 2)), tx1, ty1, tx2, ty2,
+						(int) (cx + wid * Math.cos(angle - Math.PI / 2)),
+						(int) (cy + wid * Math.sin(angle - Math.PI / 2)),
+						1 + segnumber / 6);
+			} else {
+				block = new Block(pinx1, piny1, tx1, ty1, tx2, ty2, pinx2,
+						piny2, 1 + segnumber / 6);
 			}
+
+			blockList.add(block);
+			cx = (int) coords[0];
+			cy = (int) coords[1];
+			pinx1 = tx1;
+			piny1 = ty1;
+			pinx2 = tx2;
+			piny2 = ty2;
+			pin = angle;
+			pi.next();
 		}
 
 	}
@@ -443,23 +496,29 @@ public class Game extends JPanel implements Runnable {
 					g2.setColor(Color.WHITE);
 					break;
 				}
-				Graphics2D gg = (Graphics2D) g2.create();
-				gg.translate(b.x+b.width/2, b.y+b.height/2);
-				gg.rotate(b.angle);
-				gg.fillRect(-b.width/2, -b.height/2, b.width, b.height);
-				gg.dispose();
-				
+				/*
+				 * Graphics2D gg = (Graphics2D) g2.create();
+				 * gg.translate(b.x+b.width/2, b.y+b.height/2);
+				 * gg.rotate(b.angle); gg.fillRect(-b.width/2, -b.height/2,
+				 * b.width, b.height); gg.dispose();
+				 */
+
+				int[] xPoints = { b.lines[0].AX, b.lines[1].AX, b.lines[2].AX,
+						b.lines[3].AX };
+				int[] yPoints = { b.lines[0].AY, b.lines[1].AY, b.lines[2].AY,
+						b.lines[3].AY };
+				g2.fillPolygon(xPoints, yPoints, 4);
+
 				g2.setColor(Color.PINK);
-				for (Line l: b.lines) {
+				for (Line l : b.lines) {
 					g2.drawLine(l.AX, l.AY, l.BX, l.BY);
 				}
-				//g2.drawRect(b.minX, b.minY, b.maxX-b.minX, b.maxY-b.minY);
 			}
 		}
 
 		g2.setColor(Color.WHITE);
 		g2.fillRect(paddle.x, paddle.y, paddle.width, paddle.height);
-		g2.fillOval((int) (ball.x - ball.radius), (int)(ball.y - ball.radius),
+		g2.fillOval((int) (ball.x - ball.radius), (int) (ball.y - ball.radius),
 				2 * ball.radius, 2 * ball.radius);
 		g2.drawString("FPS: " + String.valueOf(current_fps), 8, 18);
 
