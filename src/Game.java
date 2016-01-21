@@ -444,9 +444,9 @@ public class Game extends JPanel implements Runnable {
 					break;
 				}
 				Graphics2D gg = (Graphics2D) g2.create();
-				gg.translate(b.x, b.y);
+				gg.translate(b.x+b.width/2, b.y+b.height/2);
 				gg.rotate(b.angle);
-				gg.fillRect(0, 0, b.width, b.height);
+				gg.fillRect(-b.width/2, -b.height/2, b.width, b.height);
 				gg.dispose();
 				
 				g2.setColor(Color.PINK);
