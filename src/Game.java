@@ -14,6 +14,9 @@ public class Game extends JPanel implements Runnable {
 
 	int totalFrameCount = 0;
 	int current_fps = 0;
+	int fps_adjust = 0;
+	final int target_fps = 60;
+	final long optimal_time = 1000000000 / target_fps;
 
 	double lastUpdateTime = System.nanoTime();
 	private int pos_x = 0;
@@ -24,6 +27,7 @@ public class Game extends JPanel implements Runnable {
 	private int screen_width = 800;
 	private int screen_height = 600;
 	private ArrayList<Block> blockList;
+	private ArrayList<Particle> particleList;
 
 	public void addNotify() {
 		super.addNotify();
@@ -35,18 +39,20 @@ public class Game extends JPanel implements Runnable {
 		@Override
 		public void actionPerformed(ActionEvent event) {
 			current_fps = totalFrameCount;
+			if (current_fps+2 < target_fps){
+				fps_adjust--;
+			}else if (current_fps > target_fps){
+				fps_adjust++;
+			}
 			totalFrameCount = 0;
 		}
 	};
 
-	public static Color blend(Color c0, Color c1, double weight1) {
-		// double totalAlpha = c0.getAlpha() + c1.getAlpha();
-		double weight0 = 1 - weight1;// c0.getAlpha() / totalAlpha;
-		// double weight1 = c1.getAlpha() / totalAlpha;
-
-		double r = weight0 * c0.getRed() + weight1 * c1.getRed();
-		double g = weight0 * c0.getGreen() + weight1 * c1.getGreen();
-		double b = weight0 * c0.getBlue() + weight1 * c1.getBlue();
+	public static Color blend(Color c0, Color c1, double weight) {
+		double weight0 = 1 - weight;
+		double r = weight0 * c0.getRed() + weight * c1.getRed();
+		double g = weight0 * c0.getGreen() + weight * c1.getGreen();
+		double b = weight0 * c0.getBlue() + weight * c1.getBlue();
 		double a = Math.max(c0.getAlpha(), c1.getAlpha());
 
 		return new Color((int) r, (int) g, (int) b, (int) a);
@@ -94,6 +100,50 @@ public class Game extends JPanel implements Runnable {
 		}
 
 		return distance < circleRadius;
+	}
+
+	private double angleDifference(double angle1, double angle2) {
+		return ((((angle1 - angle2) % (2 * Math.PI)) + (3 * Math.PI)) % (2 * Math.PI))
+				- (Math.PI);
+	}
+
+	private class Particle {
+		private double xsp;
+		private double ysp;
+		private double x;
+		private double y;
+		private double gravity;
+		private int life;
+		private int maxlife;
+		private boolean destroy;
+		private Color col;
+
+		public Particle(double sx, double sy, double hsp, double vsp, int li,
+				Color c) {
+			this.x = sx;
+			this.y = sy;
+			this.xsp = hsp;
+			this.ysp = vsp;
+			this.life = li;
+			this.destroy = false;
+			this.maxlife = li;
+			this.gravity = 0.25;
+			this.col = c;
+		}
+
+		public void update() {
+			this.life--;
+			if (this.life <= 0) {
+				this.destroy();
+			}
+			this.ysp += this.gravity;
+			this.x += this.xsp;
+			this.y += this.ysp;
+		}
+
+		private void destroy() {
+			this.destroy = true;
+		}
 	}
 
 	private class Line {
@@ -176,13 +226,14 @@ public class Game extends JPanel implements Runnable {
 		private double light;
 		private double amp;
 		private int delay;
+		private boolean destroy;
 
 		private void destroy() {
 			if (this.prev != null)
 				this.getPrev().setNext(null);
 			if (this.next != null)
 				this.getNext().setPrev(null);
-			blockList.remove(this);
+			this.destroy = true;
 		}
 
 		private void lightUpPrev(double li, int delay) {
@@ -237,7 +288,6 @@ public class Game extends JPanel implements Runnable {
 					light -= 0.15;
 				}
 			}
-
 			if (light < 0) {
 				light = 0;
 			}
@@ -251,6 +301,7 @@ public class Game extends JPanel implements Runnable {
 			this.light = 0;
 			this.amp = 0;
 			this.delay = 0;
+			this.destroy = false;
 			this.lines = new Line[] {
 					new Line(this, this.x, this.y, this.x + this.width, this.y),
 					new Line(this, this.x + this.width, this.y, this.x
@@ -280,6 +331,7 @@ public class Game extends JPanel implements Runnable {
 			this.light = 0;
 			this.amp = 0;
 			this.delay = 0;
+			this.destroy = false;
 			this.lines = new Line[] { new Line(this, x1, y1, x2, y2),
 					new Line(this, x2, y2, x3, y3),
 					new Line(this, x3, y3, x4, y4),
@@ -334,7 +386,7 @@ public class Game extends JPanel implements Runnable {
 
 		public void update() {
 			if (light > 0) {
-				light -= 0.15;
+				light -= 0.05;
 			}
 
 			if (light < 0) {
@@ -360,13 +412,28 @@ public class Game extends JPanel implements Runnable {
 		}
 
 		private void transformDirection(double N) {
+
 			double c_speed = dist(0, 0, this.xsp, this.ysp);
 			double c_angle = Math.atan2(this.ysp, this.xsp);
 			double e_angle = 2 * N - c_angle - Math.PI;
-
 			this.xsp = c_speed * Math.cos(e_angle);
 			this.ysp = c_speed * Math.sin(e_angle);
 
+		}
+
+		private void createSparks(double N, Color C) {
+			double pdir = 0;
+			int amount = (int) (5 + 10 * Math.random());
+			for (int i = 0; i < amount; i++) {
+				pdir = (-N) / 1 - (Math.PI * 0.35) + (Math.PI * 0.7)
+						* Math.random();
+				double pspeed = 6 * Math.random();
+				Particle p = new Particle(this.x + this.radius
+						* Math.cos(-pdir), this.y + this.radius
+						* Math.sin(-pdir), pspeed * Math.cos(pdir), pspeed
+						* Math.sin(pdir), (int) (30 * Math.random()), C);
+				particleList.add(p);
+			}
 		}
 
 		private void setDirection(double N) {
@@ -378,7 +445,7 @@ public class Game extends JPanel implements Runnable {
 		}
 
 		private Line checkPlace(double cx, double cy) {
-
+			ArrayList<Line> lineList = new ArrayList<Line>();
 			for (Block b : blockList) {
 				if (collisionRectRect(this.x - this.radius + cx, this.y
 						- this.radius + cy, this.x + this.radius + cx, this.y
@@ -386,17 +453,42 @@ public class Game extends JPanel implements Runnable {
 					for (Line l : b.lines) {
 						if (collisionCircleLine(this.x + cx, this.y + cy,
 								this.radius, l.AX, l.AY, l.BX, l.BY)) {
-							return l;
+							lineList.add(l);
 						}
 					}
 				}
 			}
-			return null;
+
+			if (lineList.size() == 1) {
+				return lineList.get(0);
+			} else if (lineList.size() > 1) {
+				Line champ = lineList.get(0);
+				for (Line l : lineList) {
+					double a1 = Math.atan2(champ.BY - champ.AY, champ.BX
+							- champ.AX);
+					double a2 = Math.atan2(l.BY - l.AY, l.BX - l.AX);
+					double c = Math.atan2(ball.ysp, ball.xsp);
+
+					double actual1 = Math.abs(Math.min(
+							(angleDifference(c + Math.PI / 2, a1)),
+							(angleDifference(c - Math.PI / 2, a1))));
+					double actual2 = Math.abs(Math.min(
+							(angleDifference(c + Math.PI / 2, a2)),
+							(angleDifference(c - Math.PI / 2, a2))));
+					if (actual2 < actual1)
+						champ = l;
+				}
+				return champ;
+			} else {
+				return null;
+			}
+
 		}
 
 		private void bounce(Line l) {
-			transformDirection(-Math.PI / 2
-					+ Math.atan2(l.BY - l.AY, l.BX - l.AX));
+			double N = -Math.PI / 2 + Math.atan2(l.BY - l.AY, l.BX - l.AX);
+			this.transformDirection(N);
+			this.createSparks(N, getColorForSwitch(l.rect.hp));
 			l.rect.hit();
 		}
 
@@ -409,21 +501,26 @@ public class Game extends JPanel implements Runnable {
 					this.x + this.radius, this.y + this.radius, paddle.x,
 					paddle.y, paddle.x + paddle.width, paddle.y + paddle.height)) {
 				paddle.light = 1.0;
-				setDirection((-90 + 60
+				double newdir = (-90 + 75
 						* (ball.x - (paddle.x + paddle.width / 2))
 						/ paddle.width)
-						* Math.PI / 180);
+						* Math.PI / 180;
+				createSparks(-newdir, Color.WHITE);
+				setDirection(newdir);
 			}
 
 			if (this.x + this.radius > screen_width && this.xsp > 0) {
 				this.x = screen_width - this.radius;
 				this.xsp *= -1;
+				this.createSparks(Math.PI, Color.GRAY);
 			} else if (this.x - this.radius < 0 && this.xsp < 0) {
 				this.x = this.radius;
 				this.xsp *= -1;
+				this.createSparks(0, Color.GRAY);
 			} else if (this.y - this.radius < 0 && this.ysp < 0) {
 				this.y = this.radius;
 				this.ysp *= -1;
+				this.createSparks(3 * Math.PI / 2, Color.GRAY);
 			} else if (this.y + this.radius > screen_height && this.ysp > 0) {
 				// game over
 				this.ysp *= -1;
@@ -456,7 +553,9 @@ public class Game extends JPanel implements Runnable {
 
 		this.addMouseMotionListener(new ML());
 		this.addKeyListener(new KL());
+		this.addComponentListener(new CL());
 		blockList = new ArrayList<Block>();
+		particleList = new ArrayList<Particle>();
 
 		Timer t = new Timer(1000, updateFPS);
 		t.setInitialDelay(0);
@@ -531,11 +630,11 @@ public class Game extends JPanel implements Runnable {
 
 	}
 
+	
 	public void run() {
 
 		long last_loop = System.nanoTime();
-		final int target_fps = 60;
-		final long optimal_time = 1000000000 / target_fps;
+		
 
 		while (running) {
 
@@ -546,7 +645,7 @@ public class Game extends JPanel implements Runnable {
 			repaint();
 
 			try {
-				Thread.sleep((last_loop - System.nanoTime() + optimal_time) / 1000000);
+				Thread.sleep(fps_adjust + (last_loop - System.nanoTime() + optimal_time) / 1000000);
 			} catch (InterruptedException e) {
 				System.out.println("interrupted");
 			}
@@ -554,14 +653,60 @@ public class Game extends JPanel implements Runnable {
 		}
 	}
 
+	
+	private void sweep() {
+		// SWEEPER
+		ArrayList<Particle> copyP = new ArrayList<Particle>(particleList);
+		for (Particle p : copyP) {
+			if (p.destroy == true) {
+				particleList.remove(p);
+			}
+		}
+		ArrayList<Block> copyB = new ArrayList<Block>(blockList);
+		for (Block b : copyB) {
+			if (b.destroy == true) {
+				blockList.remove(b);
+			}
+		}
+	}
+	
 	public void update() {
 		paddle.moveTo(pos_x - paddle.width / 2);
 		ball.update();
+		paddle.update();
+		
 		for (Block b : blockList) {
 			b.update();
 		}
-		paddle.update();
+
+		for (Particle p : particleList) {
+			p.update();
+		}
+
+		sweep();
+		
 		totalFrameCount++;
+	}
+
+	private Color getColorForSwitch(int sw) {
+		switch (sw) {
+		case 1:
+			return Color.RED;
+		case 2:
+			return Color.ORANGE;
+		case 3:
+			return Color.YELLOW;
+		case 4:
+			return Color.GREEN;
+		case 5:
+			return Color.BLUE;
+		case 6:
+			return Color.MAGENTA;
+		case 7:
+			return Color.lightGray;
+		default:
+			return Color.WHITE;
+		}
 	}
 
 	public void paint(Graphics g) {
@@ -571,72 +716,60 @@ public class Game extends JPanel implements Runnable {
 				RenderingHints.VALUE_ANTIALIAS_ON);
 		Font font = new Font("Serif", Font.PLAIN, 14);
 		g2.setFont(font);
-
-		g2.drawRect(pos_x, pos_y, 64, 64);
+		sweep();
+		
 		screen_width = this.getWidth();
 		screen_height = this.getHeight();
 
 		g2.setColor(Color.BLACK);
 		g2.fillRect(0, 0, screen_width, screen_height);
 
+		g2.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER,
+				1.0f));
+
 		if (blockList.size() > 0) {
 			Color c = Color.WHITE;
 			for (Block b : blockList) {
-				switch (b.hp) {
-				case 1:
-					c = Color.RED;
-					break;
-				case 2:
-					c = Color.ORANGE;
-					break;
-				case 3:
-					c = Color.YELLOW;
-					break;
-				case 4:
-					c = Color.GREEN;
-					break;
-				case 5:
-					c = Color.BLUE;
-					break;
-				case 6:
-					c = Color.MAGENTA;
-					break;
-				case 7:
-					c = Color.lightGray;
-					break;
-				default:
-					c = Color.WHITE;
-					break;
-				}
+				c = getColorForSwitch(b.hp);
 
 				g2.setColor(blend(c, Color.WHITE,
 						b.amp * Math.sin(b.light * Math.PI)));
-				/*
-				 * Graphics2D gg = (Graphics2D) g2.create();
-				 * gg.translate(b.x+b.width/2, b.y+b.height/2);
-				 * gg.rotate(b.angle); gg.fillRect(-b.width/2, -b.height/2,
-				 * b.width, b.height); gg.dispose();
-				 */
-
 				int[] xPoints = { b.lines[0].AX, b.lines[1].AX, b.lines[2].AX,
 						b.lines[3].AX };
 				int[] yPoints = { b.lines[0].AY, b.lines[1].AY, b.lines[2].AY,
 						b.lines[3].AY };
 				g2.fillPolygon(xPoints, yPoints, 4);
 
+				for (Particle p : particleList) {
+					if (dist(0, 0, p.xsp, p.ysp) > 3) {
+						g2.setStroke(new BasicStroke(1));
+					} else {
+						g2.setStroke(new BasicStroke(2));
+					}
+					g2.setColor(new Color(
+							p.col.getRed(),
+							p.col.getGreen(),
+							p.col.getBlue(),
+							(int) (128.0 * ((float) (p.life) / (float) (p.maxlife)))));
+					g2.drawLine((int) p.x, (int) p.y, (int) (p.x - p.xsp),
+							(int) (p.y - p.ysp));
+				}
+
 				g2.setColor(Color.BLACK);
 				for (Line l : b.lines) {
-					g2.setStroke(new BasicStroke((float) (4 - 4 * b.amp
+					g2.setStroke(new BasicStroke((float) (6 /*- (b.hp/3)*/ - 4 * b.amp
 							* Math.sin(b.light * Math.PI))));
 					g2.drawLine(l.AX, l.AY, l.BX, l.BY);
 				}
 			}
 		}
 
-		g2.setColor(blend(Color.GRAY, Color.WHITE,paddle.light));
-		g2.fillRect((int)(paddle.x-8*paddle.light),(int)(paddle.y+2*paddle.light),
-				(int)(paddle.width+16*paddle.light), (int)(paddle.height-2*paddle.light));
-		
+		g2.setColor(blend(Color.GRAY, Color.WHITE, paddle.light));
+		g2.fillRect((int) (paddle.x - 8 * paddle.light),
+				(int) (paddle.y + 2 * paddle.light),
+				(int) (paddle.width + 16 * paddle.light),
+				(int) (paddle.height - 2 * paddle.light));
+
 		g2.setColor(Color.WHITE);
 		g2.fillOval((int) (ball.x - ball.radius), (int) (ball.y - ball.radius),
 				2 * ball.radius, 2 * ball.radius);
@@ -644,6 +777,7 @@ public class Game extends JPanel implements Runnable {
 
 	}
 
+	
 	public static void main(String args[]) {
 		JFrame window = new JFrame("Breakout");
 		window.setLocationByPlatform(true);
@@ -672,5 +806,11 @@ public class Game extends JPanel implements Runnable {
 
 		}
 	}
-
+	
+	public class CL extends ComponentAdapter {
+		public void componentResized(ComponentEvent e) {
+	        System.out.println("LOL");         
+	    }
+	}
+	
 }
