@@ -118,6 +118,7 @@ public class Game extends JPanel {
 	}
 
 	public void beep1() {
+		ball.light = 1.0;
 		float pan = (float) (-1.0 + 2.0 * (ball.x / orig_scr_wid));
 		int idx = (int) (4 * Math.random());
 		playSound("sounds/blip" + idx + ".wav", (float) (pan * 0.85), 0.8f,
@@ -125,6 +126,7 @@ public class Game extends JPanel {
 	}
 
 	public void beep2() {
+		ball.light = 1.0;
 		float pan = (float) (-1.0 + 2.0 * (ball.x / orig_scr_wid));
 		int idx = (int) (3 * Math.random());
 		playSound("sounds/push" + idx + ".wav", (float) (pan * 0.85), 0.7f,
@@ -132,6 +134,7 @@ public class Game extends JPanel {
 	}
 
 	public void beep3() {
+		ball.light = 1.0;
 		float pan = (float) (-1.0 + 2.0 * (ball.x / orig_scr_wid));
 		playSound("sounds/blast.wav", (float) (pan * 0.85), 0.8f, 14000);
 	}
@@ -633,11 +636,15 @@ public class Game extends JPanel {
 		private double ysp;
 		private int radius;
 		private boolean shot;
+		private double light;
+		private Color col;
 
 		public Ball(double xx, double yy) {
 			this.x = xx;
 			this.y = yy;
 			this.radius = 4;
+			this.light = 0;
+			this.col = Color.white;
 
 			this.xsp = 0;
 			this.ysp = 0;
@@ -724,7 +731,8 @@ public class Game extends JPanel {
 		private void bounce(Line l) {
 			double N = -Math.PI / 2 + Math.atan2(l.BY - l.AY, l.BX - l.AX);
 			this.transformDirection(N);
-			this.createSparks(N, getColorForSwitch(l.rect.hp));
+			this.col = getColorForSwitch(l.rect.hp);
+			this.createSparks(N, this.col);
 
 			if (l.rect.hp <= 1 && !l.rect.destroy) {
 				DeadBlock db = new DeadBlock(l.rect.lines[0].AX,
@@ -755,6 +763,15 @@ public class Game extends JPanel {
 				return;
 			}
 
+			if (this.light > 0) {
+				this.light -= 0.1 * spdf;
+			}else{
+				this.col = Color.white;
+			}
+			if (this.light < 0) {
+				this.light = 0;
+			}
+			
 			if (Math.abs(ysp) < 1) {
 				ysp = Math.signum(ysp);
 			}
@@ -773,6 +790,7 @@ public class Game extends JPanel {
 					this.y = paddle.y - 2 * this.radius - 1;
 				}
 				beep3();
+				this.col = Color.WHITE;
 				camy += force;
 			}
 
@@ -782,6 +800,7 @@ public class Game extends JPanel {
 				right_wall = 1;
 				this.createSparks(Math.PI, Color.LIGHT_GRAY);
 				beep2();
+				this.col = Color.WHITE;
 				camx += force;
 			} else if (this.x - this.radius < 0 && this.xsp < 0) {
 				this.x = this.radius;
@@ -789,6 +808,7 @@ public class Game extends JPanel {
 				left_wall = 1;
 				this.createSparks(0, Color.LIGHT_GRAY);
 				beep2();
+				this.col = Color.WHITE;
 				camx -= force;
 			} else if (this.y - this.radius < 0 && this.ysp < 0) {
 				this.y = this.radius;
@@ -796,6 +816,7 @@ public class Game extends JPanel {
 				top_wall = 1;
 				this.createSparks(3 * Math.PI / 2, Color.LIGHT_GRAY);
 				beep2();
+				this.col = Color.WHITE;
 				camy -= force;
 			} else if (this.y > orig_scr_hgt && this.ysp > 0) {
 				this.xsp = 0;
@@ -821,10 +842,10 @@ public class Game extends JPanel {
 		}
 
 		public void render(Graphics2D g2) {
-			g2.setColor(Color.WHITE);
-			g2.fillOval((int) (this.x - this.radius),
-					(int) (this.y - this.radius), 2 * this.radius,
-					2 * this.radius);
+			g2.setColor(blend(Color.LIGHT_GRAY,this.col,this.light));
+			g2.fillOval((int) (this.x - this.radius - 4*this.light),
+					(int) (this.y - this.radius - 4*this.light), (int) (2 * (this.radius + 4*this.light)),
+					(int) (2 * (this.radius + 4*this.light)));
 		}
 	}
 
@@ -989,7 +1010,6 @@ public class Game extends JPanel {
 		}
 
 		if (scr_li > 0) {
-
 			scr_li -= 0.15 * spdf;
 		}
 		if (scr_li < 0) {
@@ -1112,7 +1132,7 @@ public class Game extends JPanel {
 		}
 
 		g2.setFont(new Font("IMPACT", Font.BOLD, (int) (maxin + 22 + 10 * li)));
-		g2.drawString("SCORE: " + String.valueOf((int) Math.round(draw_score)),
+		g2.drawString("SCORE: " + String.valueOf(10*((int) Math.round(draw_score))),
 				8, (int) (28 + maxin));
 
 		g2.setColor(Color.GRAY);
