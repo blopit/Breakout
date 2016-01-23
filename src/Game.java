@@ -18,7 +18,12 @@ public class Game extends JPanel {
 	int totalFrameCount = 0;
 	int current_fps = 0;
 	int fps_adjust = 0;
+
 	final int target_fps = 60;
+	final int ball_speed = 4;
+
+	final double spdf = 60.0 / target_fps;
+
 	final long optimal_time = 1000000000 / target_fps;
 	final int orig_scr_wid = 800;
 	final int orig_scr_hgt = 600;
@@ -28,6 +33,16 @@ public class Game extends JPanel {
 	private int pos_y = 0;
 	private double xscale = 1.0;
 	private double yscale = 1.0;
+	private double camx = 16;
+	private double camy = 16;
+
+	private int score = 0;
+	private double draw_score = 0;
+	private double scr_li = 0.0;
+	private double force = 1.5;
+
+	private boolean vk_right = false;
+	private boolean vk_left = false;
 
 	private Ball ball;
 	private Paddle paddle;
@@ -41,7 +56,12 @@ public class Game extends JPanel {
 	private float top_wall = 0;
 	private float right_wall = 0;
 
-	public static synchronized void playSound(final String url, float p, float v) {
+	Color c_orange = new Color(255, 128, 0);
+	Color c_purple = new Color(128, 0, 128);
+	Color c_blue = new Color(0, 0, 255);
+
+	public static synchronized void playSound(final String url, float p,
+			float v, int reserve) {
 		new Thread(new Runnable() {
 			// The wrapper thread is unnecessary, unless it blocks on the
 			// Clip finishing; see comments.
@@ -61,10 +81,11 @@ public class Game extends JPanel {
 
 					audioLine.start();
 
-					byte[] bytes = new byte[20000];
+					byte[] bytes = new byte[reserve];
+					// ClassLoader classLoader =
+					// Thread.currentThread().getContextClassLoader();
 					AudioInputStream audioStream = AudioSystem
-							.getAudioInputStream(Game.class
-									.getResourceAsStream("" + url));
+							.getAudioInputStream(getClass().getResource(url));
 					audioLine.getControls();
 
 					FloatControl pan = (FloatControl) audioLine
@@ -99,25 +120,31 @@ public class Game extends JPanel {
 	public void beep1() {
 		float pan = (float) (-1.0 + 2.0 * (ball.x / orig_scr_wid));
 		int idx = (int) (4 * Math.random());
-		playSound("/sound/blip" + idx + ".wav", (float) (pan * 0.85), 0.8f);
+		playSound("sounds/blip" + idx + ".wav", (float) (pan * 0.85), 0.8f,
+				14000);
 	}
 
 	public void beep2() {
 		float pan = (float) (-1.0 + 2.0 * (ball.x / orig_scr_wid));
 		int idx = (int) (3 * Math.random());
-		playSound("/sound/push" + idx + ".wav", (float) (pan * 0.85), 0.7f);
+		playSound("sounds/push" + idx + ".wav", (float) (pan * 0.85), 0.7f,
+				24000);
 	}
 
 	public void beep3() {
 		float pan = (float) (-1.0 + 2.0 * (ball.x / orig_scr_wid));
-		playSound("/sound/blast.wav", (float) (pan * 0.85), 0.8f);
+		playSound("sounds/blast.wav", (float) (pan * 0.85), 0.8f, 14000);
+	}
+
+	public void beepDead() {
+		playSound("sounds/ded.wav", 0.0f, 0.8f, 240000);
 	}
 
 	ActionListener updateFPS = new ActionListener() {
 		@Override
 		public void actionPerformed(ActionEvent event) {
 			current_fps = totalFrameCount;
-			if (current_fps + 2 < target_fps) {
+			if (current_fps + 1 < target_fps) {
 				fps_adjust--;
 			} else if (current_fps - 1 > target_fps) {
 				fps_adjust++;
@@ -206,7 +233,7 @@ public class Game extends JPanel {
 			this.Y3 = y3;
 			this.X4 = x4;
 			this.Y4 = y4;
-			this.gravity = 0;
+			this.gravity = 0 * spdf;
 		}
 
 		public void update() {
@@ -215,8 +242,8 @@ public class Game extends JPanel {
 				this.destroy();
 			}
 			this.ysp += this.gravity;
-			this.x += this.xsp;
-			this.y += this.ysp;
+			this.x += this.xsp * spdf;
+			this.y += this.ysp * spdf;
 		}
 
 		public void destroy() {
@@ -258,10 +285,10 @@ public class Game extends JPanel {
 			this.y = sy;
 			this.xsp = hsp;
 			this.ysp = vsp;
-			this.life = li;
+			this.life = (int) (li / spdf);
 			this.destroy = false;
-			this.maxlife = li;
-			this.gravity = 0.25;
+			this.maxlife = this.life;
+			this.gravity = 0.25 * spdf;
 			this.col = c;
 		}
 
@@ -271,8 +298,8 @@ public class Game extends JPanel {
 				this.destroy();
 			}
 			this.ysp += this.gravity;
-			this.x += this.xsp;
-			this.y += this.ysp;
+			this.x += this.xsp * spdf;
+			this.y += this.ysp * spdf;
 		}
 
 		public void destroy() {
@@ -282,9 +309,9 @@ public class Game extends JPanel {
 		public void render(Graphics2D g2) {
 			double sp = dist(0, 0, this.xsp, this.ysp);
 			if (sp > 4) {
-				g2.setStroke(new BasicStroke(1));
-			} else if (sp > 2) {
 				g2.setStroke(new BasicStroke(2));
+			} else if (sp > 2) {
+				g2.setStroke(new BasicStroke(2.5f));
 			} else {
 				g2.setStroke(new BasicStroke(3));
 			}
@@ -397,7 +424,7 @@ public class Game extends JPanel {
 				return;
 			this.amp = li;
 			this.light = 1.0;
-			this.delay = delay;
+			this.delay = (int) (delay / spdf);
 			if (this.light > 1)
 				this.light = 1;
 			if (this.getPrev() != null)
@@ -409,7 +436,7 @@ public class Game extends JPanel {
 				return;
 			this.amp = li;
 			this.light = 1.0;
-			this.delay = delay;
+			this.delay = (int) (delay / spdf);
 			if (this.light > 1)
 				this.light = 1;
 			if (this.getNext() != null)
@@ -419,6 +446,8 @@ public class Game extends JPanel {
 		public void hit() {
 			this.light = 1.0;
 			this.amp = 1.0;
+			scr_li = 1.0;
+			score += 100;
 
 			if (this.prev != null)
 				this.getPrev().lightUpPrev(1.0 / 1.5, 2);
@@ -428,6 +457,7 @@ public class Game extends JPanel {
 			this.hp--;
 			if (this.hp <= 0) {
 				this.destroy();
+				score += 150;
 			}
 		}
 
@@ -437,7 +467,7 @@ public class Game extends JPanel {
 			} else {
 				if (light > 0) {
 
-					light -= 0.15;
+					light -= 0.15 * spdf;
 				}
 			}
 			if (light < 0) {
@@ -519,31 +549,36 @@ public class Game extends JPanel {
 
 		public void render(Graphics2D g2) {
 			Color c = getColorForSwitch(this.hp);
+			double li = this.amp * Math.sin(this.light * Math.PI);
 
-			g2.setColor(blend(c, Color.WHITE,
-					this.amp * Math.sin(this.light * Math.PI)));
+			g2.setColor(blend(c, Color.WHITE, li));
+
 			int[] x_points = { this.lines[0].AX, this.lines[1].AX,
 					this.lines[2].AX, this.lines[3].AX };
 			int[] y_points = { this.lines[0].AY, this.lines[1].AY,
 					this.lines[2].AY, this.lines[3].AY };
+
 			g2.fillPolygon(x_points, y_points, 4);
 			g2.setColor(Color.BLACK);
+
 			for (Line l : this.lines) {
-				g2.setStroke(new BasicStroke((float) (6 - 6 * this.amp
-						* Math.sin(this.light * Math.PI))));
+				g2.setStroke(new BasicStroke((float) (6 - 6 * li)));
 				g2.drawLine(l.AX, l.AY, l.BX, l.BY);
 			}
+
 		}
 	}
 
 	private class Paddle extends Rect {
 		private int hsp;
 		private double light;
+		private int mouse;
 
 		public Paddle(int x, int y, int width, int height) {
 			super(x, y, width, height);
-			this.hsp = 32;
+			this.hsp = (int) (8 * spdf);
 			this.light = 0;
+			this.mouse = 0;
 		}
 
 		private void moveTo(int dx) {
@@ -551,12 +586,30 @@ public class Game extends JPanel {
 				this.x += this.hsp * Math.signum((double) (dx - this.x));
 			} else {
 				this.x = dx;
+				mouse = 0;
+			}
+
+			if (this.x < 0) {
+				this.x = 0;
+			} else if (this.x + this.width > orig_scr_wid) {
+				this.x = orig_scr_wid - this.width;
 			}
 		}
 
 		public void update() {
+			if (this.mouse > 0) {
+				this.mouse--;
+				paddle.moveTo(pos_x - this.width / 2);
+			}
+
+			if (vk_left && !vk_right) {
+				paddle.moveTo(this.x - this.hsp);
+			} else if (!vk_left && vk_right) {
+				paddle.moveTo(this.x + this.hsp);
+			}
+
 			if (light > 0) {
-				light -= 0.05;
+				light -= 0.05 * spdf;
 			}
 
 			if (light < 0) {
@@ -579,14 +632,16 @@ public class Game extends JPanel {
 		private double xsp;
 		private double ysp;
 		private int radius;
+		private boolean shot;
 
 		public Ball(double xx, double yy) {
 			this.x = xx;
 			this.y = yy;
 			this.radius = 4;
 
-			this.xsp = 3;
-			this.ysp = -4;
+			this.xsp = 0;
+			this.ysp = 0;
+			this.shot = false;
 		}
 
 		private void transformDirection(double N) {
@@ -596,6 +651,8 @@ public class Game extends JPanel {
 			double e_angle = 2 * N - c_angle - Math.PI;
 			this.xsp = c_speed * Math.cos(e_angle);
 			this.ysp = c_speed * Math.sin(e_angle);
+			camx += force * Math.cos(N);
+			camy += force * Math.sin(N);
 
 		}
 
@@ -682,7 +739,22 @@ public class Game extends JPanel {
 			l.rect.hit();
 		}
 
+		public void launch() {
+			if (!this.shot) {
+				beep3();
+				this.shot = true;
+				this.xsp = ball_speed * spdf * Math.cos(Math.PI / 4);
+				this.ysp = -ball_speed * spdf * Math.sin(Math.PI / 4);
+			}
+		}
+
 		public void update() {
+			if (!shot) {
+				this.x = paddle.x + paddle.width / 2;
+				this.y = paddle.y - this.radius - 1;
+				return;
+			}
+
 			if (Math.abs(ysp) < 1) {
 				ysp = Math.signum(ysp);
 			}
@@ -697,7 +769,11 @@ public class Game extends JPanel {
 						* Math.PI / 180;
 				createSparks(-newdir, Color.WHITE);
 				setDirection(newdir);
+				if (this.y + 2 * this.radius > paddle.y) {
+					this.y = paddle.y - 2 * this.radius - 1;
+				}
 				beep3();
+				camy += force;
 			}
 
 			if (this.x + this.radius > orig_scr_wid && this.xsp > 0) {
@@ -706,21 +782,27 @@ public class Game extends JPanel {
 				right_wall = 1;
 				this.createSparks(Math.PI, Color.LIGHT_GRAY);
 				beep2();
+				camx += force;
 			} else if (this.x - this.radius < 0 && this.xsp < 0) {
 				this.x = this.radius;
 				this.xsp *= -1;
 				left_wall = 1;
 				this.createSparks(0, Color.LIGHT_GRAY);
 				beep2();
+				camx -= force;
 			} else if (this.y - this.radius < 0 && this.ysp < 0) {
 				this.y = this.radius;
 				this.ysp *= -1;
 				top_wall = 1;
 				this.createSparks(3 * Math.PI / 2, Color.LIGHT_GRAY);
 				beep2();
-			} else if (this.y + this.radius > orig_scr_hgt && this.ysp > 0) {
-				// game over
-				this.ysp *= -1;
+				camy -= force;
+			} else if (this.y > orig_scr_hgt && this.ysp > 0) {
+				this.xsp = 0;
+				this.ysp = 0;
+				this.shot = false;
+				score /= 2;
+				beepDead();
 			}
 
 			Line tempL = null;
@@ -747,17 +829,22 @@ public class Game extends JPanel {
 	}
 
 	public Game() {
-		BufferedImage cursorImg = new BufferedImage(16, 16,
-				BufferedImage.TYPE_INT_ARGB);
-		Cursor blankCursor = Toolkit.getDefaultToolkit().createCustomCursor(
-				cursorImg, new Point(0, 0), "blank cursor");
-		this.setCursor(blankCursor);
+
+		/*
+		 * REMOVE CURSOR code BufferedImage cursorImg = new BufferedImage(16,
+		 * 16, BufferedImage.TYPE_INT_ARGB); Cursor blankCursor =
+		 * Toolkit.getDefaultToolkit().createCustomCursor( cursorImg, new
+		 * Point(0, 0), "blank cursor"); this.setCursor(blankCursor);
+		 */
 
 		this.setFocusable(true);
 
-		this.addMouseMotionListener(new ML());
+		MouseAdapter ml = new ML();
+		this.addMouseListener(ml);
+		this.addMouseMotionListener(ml);
 		this.addKeyListener(new KL());
 		this.addComponentListener(new CL());
+
 		blockList = new ArrayList<Block>();
 		particleList = new ArrayList<Particle>();
 		dbList = new ArrayList<DeadBlock>();
@@ -766,7 +853,7 @@ public class Game extends JPanel {
 		t.setInitialDelay(0);
 		t.start();
 
-		ball = new Ball(128, 500);
+		ball = new Ball(0, 0);
 		paddle = new Paddle(256, 540, 64, 8);
 
 		Path2D.Double path = new Path2D.Double();
@@ -788,7 +875,7 @@ public class Game extends JPanel {
 
 		FlatteningPathIterator fpi = new FlatteningPathIterator(
 				path.getPathIterator(at), 3, 6);
-		PathIterator pi = fpi;// path.getPathIterator(at);
+		PathIterator pi = fpi;
 		int segnumber = 0;
 		while (pi.isDone() == false) {
 			segnumber++;
@@ -837,8 +924,7 @@ public class Game extends JPanel {
 
 				while (running) {
 
-					long now = System.nanoTime();
-					last_loop = now;
+					last_loop = System.nanoTime();
 
 					update();
 					repaint();
@@ -858,6 +944,7 @@ public class Game extends JPanel {
 
 	}
 
+	// remove dead entities
 	private void sweep() {
 		// SWEEPER
 		ArrayList<Particle> copyP = new ArrayList<Particle>(particleList);
@@ -900,24 +987,37 @@ public class Game extends JPanel {
 		if (right_wall < 0) {
 			right_wall = 0;
 		}
+
+		if (scr_li > 0) {
+
+			scr_li -= 0.15 * spdf;
+		}
+		if (scr_li < 0) {
+			scr_li = 0;
+		}
+
+		double dis = dist(0, 0, camx, camy);
+		double dir = Math.atan2(-camy, -camx);
+		camx += Math.cos(dir) * dis * 0.05;
+		camy += Math.sin(dir) * dis * 0.05;
+
 	}
 
 	private void render_walls(Graphics2D g2) {
-		g2.setStroke(new BasicStroke(3 + 2 * left_wall));
+		g2.setStroke(new BasicStroke(6 + 2 * left_wall));
 		g2.setColor(blend(Color.GRAY, Color.WHITE, left_wall));
 		g2.drawLine(0, 0, 0, orig_scr_hgt);
 
-		g2.setStroke(new BasicStroke(3 + 2 * top_wall));
+		g2.setStroke(new BasicStroke(6 + 2 * top_wall));
 		g2.setColor(blend(Color.GRAY, Color.WHITE, top_wall));
 		g2.drawLine(0, 0, orig_scr_wid - 1, 0);
 
-		g2.setStroke(new BasicStroke(3 + 2 * right_wall));
+		g2.setStroke(new BasicStroke(6 + 2 * right_wall));
 		g2.setColor(blend(Color.GRAY, Color.WHITE, right_wall));
 		g2.drawLine(orig_scr_wid - 1, 0, orig_scr_wid - 1, orig_scr_hgt);
 	}
 
 	public void update() {
-		paddle.moveTo(pos_x - paddle.width / 2);
 		ball.update();
 		paddle.update();
 
@@ -945,17 +1045,17 @@ public class Game extends JPanel {
 		case 1:
 			return Color.RED;
 		case 2:
-			return Color.ORANGE;
+			return c_orange;
 		case 3:
 			return Color.YELLOW;
 		case 4:
 			return Color.GREEN;
 		case 5:
-			return Color.BLUE;
+			return c_blue;
 		case 6:
 			return Color.MAGENTA;
 		case 7:
-			return Color.lightGray;
+			return c_purple;
 		default:
 			return Color.WHITE;
 		}
@@ -966,13 +1066,14 @@ public class Game extends JPanel {
 		Graphics2D g2 = (Graphics2D) g;
 		g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING,
 				RenderingHints.VALUE_ANTIALIAS_ON);
-		Font font = new Font("Serif", Font.PLAIN, 14);
-		g2.setFont(font);
+
 		sweep();
 
 		g2.scale(xscale, yscale);
+		g2.translate(camx, camy);
 		g2.setColor(Color.BLACK);
-		g2.fillRect(0, 0, orig_scr_wid, orig_scr_hgt);
+		g2.fillRect((int) (-camx), (int) (-camy), (int) (orig_scr_wid),
+				(int) (orig_scr_hgt));
 
 		this.render_walls(g2);
 
@@ -992,8 +1093,32 @@ public class Game extends JPanel {
 			p.render(g2);
 		}
 
-		g2.setColor(Color.WHITE);
-		g2.drawString("FPS: " + String.valueOf(current_fps), 8, 18);
+		double li = Math.sin(scr_li * Math.PI / 2);
+		g2.setColor(blend(
+				getColorForSwitch((int) (1 + 6 * draw_score / 17000)),
+				Color.WHITE, li * 0.5 + 0.25));
+
+		double maxin = 20.0 * (double) draw_score / 17000;
+
+		// scr_li = (score - draw_score)/200;
+
+		if (score > draw_score) {
+			draw_score += ((score - draw_score) * 0.2);
+		} else if (score < Math.round(draw_score)) {
+			double dir = Math.random() * Math.PI * 2;
+			camx += 2 * Math.cos(dir);
+			camy += 2 * Math.sin(dir);
+			draw_score += ((score - draw_score) * 0.05);
+		}
+
+		g2.setFont(new Font("IMPACT", Font.BOLD, (int) (maxin + 22 + 10 * li)));
+		g2.drawString("SCORE: " + String.valueOf((int) Math.round(draw_score)),
+				8, (int) (28 + maxin));
+
+		g2.setColor(Color.GRAY);
+		g2.setFont(new Font("IMPACT", Font.PLAIN, 12));
+		g2.drawString("FPS: " + String.valueOf(current_fps), 8,
+				(int) (48 + maxin));
 
 	}
 
@@ -1006,10 +1131,23 @@ public class Game extends JPanel {
 		window.setVisible(true);
 	}
 
-	public class ML extends MouseMotionAdapter {
+	public class ML extends MouseAdapter {
 		public void mouseMoved(MouseEvent e) {
 			pos_x = (int) (e.getX() / xscale);
 			pos_y = (int) (e.getY() / yscale);
+			paddle.mouse = (int) (60 / spdf);
+		}
+
+		public void mousePressed(MouseEvent e) {
+			if (e.getButton() == MouseEvent.BUTTON1) {
+				ball.launch();
+			}
+		}
+
+		public void mouseClicked(MouseEvent e) {
+			if (e.getButton() == MouseEvent.BUTTON1) {
+				ball.launch();
+			}
 		}
 	}
 
@@ -1018,11 +1156,23 @@ public class Game extends JPanel {
 			int key = e.getKeyCode();
 
 			if (key == KeyEvent.VK_LEFT) {
-				paddle.moveTo(paddle.x - paddle.hsp);
+				vk_left = true;
 			} else if (key == KeyEvent.VK_RIGHT) {
-				paddle.moveTo(paddle.x + paddle.hsp);
+				vk_right = true;
+			} else if (key == KeyEvent.VK_SPACE) {
+				ball.launch();
 			}
 
+		}
+
+		public void keyReleased(KeyEvent e) {
+			int key = e.getKeyCode();
+
+			if (key == KeyEvent.VK_LEFT) {
+				vk_left = false;
+			} else if (key == KeyEvent.VK_RIGHT) {
+				vk_right = false;
+			}
 		}
 	}
 

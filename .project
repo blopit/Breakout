@@ -14,11 +14,4 @@
 	<natures>
 		<nature>org.eclipse.jdt.core.javanature</nature>
 	</natures>
-	<linkedResources>
-		<link>
-			<name>blip.wav</name>
-			<type>1</type>
-			<locationURI>PROJECT_LOC/src/sound/blip.wav</locationURI>
-		</link>
-	</linkedResources>
 </projectDescription>
