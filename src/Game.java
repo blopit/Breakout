@@ -2,6 +2,7 @@ import java.awt.*;
 import java.awt.event.*;
 import java.awt.geom.*;
 import java.awt.image.BufferedImage;
+import java.awt.image.DataBufferInt;
 import java.io.File;
 import java.io.IOException;
 import java.util.*;
@@ -20,7 +21,7 @@ public class Game extends JPanel {
 	int fps_adjust = 0;
 
 	final int target_fps = 60;
-	final int ball_speed = 4;
+	final int ball_speed = 6;
 
 	final double spdf = 60.0 / target_fps;
 
@@ -39,7 +40,7 @@ public class Game extends JPanel {
 	private int score = 0;
 	private double draw_score = 0;
 	private double scr_li = 0.0;
-	private double force = 1.5;
+	private double force = 1;
 
 	private boolean vk_right = false;
 	private boolean vk_left = false;
@@ -164,6 +165,13 @@ public class Game extends JPanel {
 		double a = Math.max(c0.getAlpha(), c1.getAlpha());
 
 		return new Color((int) r, (int) g, (int) b, (int) a);
+	}
+
+	public static Color blendAlpha(Color c0, Color c1, double weight, int alpha) {
+		Color c = blend(c0, c1, weight);
+
+		return new Color((int) c.getRed(), (int) c.getGreen(),
+				(int) c.getBlue(), (int) alpha);
 	}
 
 	private float dist(double d, double e, double camx2, double camy2) {
@@ -642,7 +650,7 @@ public class Game extends JPanel {
 		public Ball(double xx, double yy) {
 			this.x = xx;
 			this.y = yy;
-			this.radius = 4;
+			this.radius = 5;
 			this.light = 0;
 			this.col = Color.white;
 
@@ -765,13 +773,13 @@ public class Game extends JPanel {
 
 			if (this.light > 0) {
 				this.light -= 0.1 * spdf;
-			}else{
+			} else {
 				this.col = Color.white;
 			}
 			if (this.light < 0) {
 				this.light = 0;
 			}
-			
+
 			if (Math.abs(ysp) < 1) {
 				ysp = Math.signum(ysp);
 			}
@@ -842,10 +850,43 @@ public class Game extends JPanel {
 		}
 
 		public void render(Graphics2D g2) {
-			g2.setColor(blend(Color.LIGHT_GRAY,this.col,this.light));
-			g2.fillOval((int) (this.x - this.radius - 4*this.light),
-					(int) (this.y - this.radius - 4*this.light), (int) (2 * (this.radius + 4*this.light)),
-					(int) (2 * (this.radius + 4*this.light)));
+
+			if (!shot) {
+				g2.setColor(blend(Color.LIGHT_GRAY, this.col, this.light));
+
+				g2.fillOval((int) (this.x - this.radius - 4 * this.light),
+						(int) (this.y - this.radius - 4 * this.light),
+						(int) (2 * 1 * (this.radius + 4 * this.light)),
+						(int) (2 * 1 * (this.radius + 4 * this.light)));
+				return;
+			}
+
+			Graphics2D g2d = (Graphics2D) g2.create();
+
+			double s = 1;
+			double dir = Math.atan2(ysp, xsp);
+			if (dist(0, 0, xsp, ysp) != 0) {
+				s = 1.25 * dist(0, 0, xsp, ysp) / ball_speed;
+			}
+			s = 1;
+			g2d.translate(this.x, this.y);
+			g2d.rotate(dir);
+
+			for (int i = 0; i < 6; i++) {
+				s = (1 - ((double) Math.abs(3 - i) / 3));
+				g2d.setColor(blendAlpha(Color.LIGHT_GRAY, this.col, this.light,
+						(int) (255 * s)));
+
+				g2d.fillOval(
+						(int) (0 - this.radius - 4 * this.light - (2 + 2 * this.light)
+								* (6 - i)),
+						(int) (0 - this.radius - 4 * this.light),
+						(int) (2 * (this.radius + 4 * this.light)),
+						(int) (1.6 * (this.radius + 4 * this.light)));
+
+			}
+			g2d.dispose();
+
 		}
 	}
 
@@ -1087,7 +1128,7 @@ public class Game extends JPanel {
 		g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING,
 				RenderingHints.VALUE_ANTIALIAS_ON);
 
-		sweep();
+		g.setColor(new Color(0x00000000));
 
 		g2.scale(xscale, yscale);
 		g2.translate(camx, camy);
@@ -1132,7 +1173,8 @@ public class Game extends JPanel {
 		}
 
 		g2.setFont(new Font("IMPACT", Font.BOLD, (int) (maxin + 22 + 10 * li)));
-		g2.drawString("SCORE: " + String.valueOf(10*((int) Math.round(draw_score))),
+		g2.drawString(
+				"SCORE: " + String.valueOf(10 * ((int) Math.round(draw_score))),
 				8, (int) (28 + maxin));
 
 		g2.setColor(Color.GRAY);
