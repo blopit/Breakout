@@ -28,6 +28,7 @@ public class Game extends JPanel {
 	final long optimal_time = 1000000000 / target_fps;
 	final int orig_scr_wid = 800;
 	final int orig_scr_hgt = 600;
+	final double force = 1;
 
 	private double lastUpdateTime = System.nanoTime();
 	private int pos_x = 0;
@@ -40,15 +41,12 @@ public class Game extends JPanel {
 	private int score = 0;
 	private double draw_score = 0;
 	private double scr_li = 0.0;
-	private double force = 1;
 
 	private boolean vk_right = false;
 	private boolean vk_left = false;
 
 	private Ball ball;
 	private Paddle paddle;
-	private int screen_width = 800;
-	private int screen_height = 600;
 	private ArrayList<Block> blockList;
 	private ArrayList<Particle> particleList;
 	private ArrayList<DeadBlock> dbList;
@@ -674,7 +672,7 @@ public class Game extends JPanel {
 		private void createSparks(double N, Color C) {
 
 			double pdir = 0;
-			int amount = (int) (5 + 10 * Math.random());
+			int amount = (int) (10 + 5 * Math.random());
 			for (int i = 0; i < amount; i++) {
 				pdir = (-N) / 1 - (Math.PI * 0.35) + (Math.PI * 0.7)
 						* Math.random();
@@ -702,6 +700,12 @@ public class Game extends JPanel {
 						- this.radius + cy, this.x + this.radius + cx, this.y
 						+ this.radius + cy, b.minX, b.minY, b.maxX, b.maxY)) {
 					for (Line l : b.lines) {
+						if (l.rect.destroy)
+							continue;
+						if (l.rect.getNext() != null && l == l.rect.lines[1])
+							continue;
+						if (l.rect.getPrev() != null && l == l.rect.lines[3])
+							continue;
 						if (collisionCircleLine(this.x + cx, this.y + cy,
 								this.radius, l.AX, l.AY, l.BX, l.BY)) {
 							lineList.add(l);
@@ -765,12 +769,6 @@ public class Game extends JPanel {
 		}
 
 		public void update() {
-			if (!shot) {
-				this.x = paddle.x + paddle.width / 2;
-				this.y = paddle.y - this.radius - 1;
-				return;
-			}
-
 			if (this.light > 0) {
 				this.light -= 0.1 * spdf;
 			} else {
@@ -778,6 +776,12 @@ public class Game extends JPanel {
 			}
 			if (this.light < 0) {
 				this.light = 0;
+			}
+			
+			if (!shot) {
+				this.x = paddle.x + paddle.width / 2;
+				this.y = paddle.y - this.radius - 1;
+				return;
 			}
 
 			if (Math.abs(ysp) < 1) {
@@ -936,7 +940,7 @@ public class Game extends JPanel {
 		Block prev = null;
 
 		FlatteningPathIterator fpi = new FlatteningPathIterator(
-				path.getPathIterator(at), 3, 6);
+				path.getPathIterator(at), 4,14);
 		PathIterator pi = fpi;
 		int segnumber = 0;
 		while (pi.isDone() == false) {
@@ -1128,13 +1132,11 @@ public class Game extends JPanel {
 		g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING,
 				RenderingHints.VALUE_ANTIALIAS_ON);
 
-		g.setColor(new Color(0x00000000));
-
 		g2.scale(xscale, yscale);
 		g2.translate(camx, camy);
 		g2.setColor(Color.BLACK);
-		g2.fillRect((int) (-camx), (int) (-camy), (int) (orig_scr_wid),
-				(int) (orig_scr_hgt));
+		g2.fillRect((int) (-camx-2), (int) (-camy-2), (int) (orig_scr_wid+4),
+				(int) (orig_scr_hgt+4));
 
 		this.render_walls(g2);
 
@@ -1142,7 +1144,8 @@ public class Game extends JPanel {
 			d.render(g2);
 		}
 
-		for (Block b : blockList) {
+		ArrayList<Block> copyB = new ArrayList<Block>(blockList);
+		for (Block b : copyB) {
 			b.render(g2);
 		}
 
@@ -1240,8 +1243,6 @@ public class Game extends JPanel {
 
 	public class CL extends ComponentAdapter {
 		public void componentResized(ComponentEvent e) {
-			screen_width = e.getComponent().getWidth();
-			screen_height = e.getComponent().getHeight();
 			xscale = (double) e.getComponent().getWidth()
 					/ (double) orig_scr_wid;
 			yscale = (double) e.getComponent().getHeight()
