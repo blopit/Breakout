@@ -21,16 +21,18 @@ public class Game extends JPanel {
 	int fps_adjust = 0;
 
 	final int target_fps = 60;
-	final int ball_speed = 6;
+	final int ball_speed = 8;
 
-	final double spdf = 60.0 / target_fps;
+	final double fps_factor = 60.0 / target_fps;
+	private double time_factor = 1.0;
+	private double spdf = fps_factor * time_factor;
 
 	final long optimal_time = 1000000000 / target_fps;
 	final int orig_scr_wid = 800;
 	final int orig_scr_hgt = 600;
 	final double force = 1;
 
-	private double lastUpdateTime = System.nanoTime();
+	//private double lastUpdateTime = System.nanoTime();
 	private int pos_x = 0;
 	private int pos_y = 0;
 	private double xscale = 1.0;
@@ -41,7 +43,9 @@ public class Game extends JPanel {
 	private int score = 0;
 	private double draw_score = 0;
 	private double scr_li = 0.0;
-
+	private int lives = 3;
+	private int room = 0;
+	
 	private boolean vk_right = false;
 	private boolean vk_left = false;
 
@@ -160,7 +164,7 @@ public class Game extends JPanel {
 		double r = weight0 * c0.getRed() + weight * c1.getRed();
 		double g = weight0 * c0.getGreen() + weight * c1.getGreen();
 		double b = weight0 * c0.getBlue() + weight * c1.getBlue();
-		double a = Math.max(c0.getAlpha(), c1.getAlpha());
+		double a = Math.min(c0.getAlpha(), c1.getAlpha());
 
 		return new Color((int) r, (int) g, (int) b, (int) a);
 	}
@@ -320,9 +324,9 @@ public class Game extends JPanel {
 			if (sp > 4) {
 				g2.setStroke(new BasicStroke(2));
 			} else if (sp > 2) {
-				g2.setStroke(new BasicStroke(2.5f));
-			} else {
 				g2.setStroke(new BasicStroke(3));
+			} else {
+				g2.setStroke(new BasicStroke(4));
 			}
 
 			g2.setColor(new Color(
@@ -557,22 +561,29 @@ public class Game extends JPanel {
 		}
 
 		public void render(Graphics2D g2) {
+			
+			Graphics2D g2d = g2;
+			
 			Color c = getColorForSwitch(this.hp);
+			if (hp == 1){
+				c = blendAlpha(c,Color.WHITE,0,64);
+			}
+			
 			double li = this.amp * Math.sin(this.light * Math.PI);
 
-			g2.setColor(blend(c, Color.WHITE, li));
+			g2d.setColor(blend(c, Color.WHITE, li));
 
 			int[] x_points = { this.lines[0].AX, this.lines[1].AX,
 					this.lines[2].AX, this.lines[3].AX };
 			int[] y_points = { this.lines[0].AY, this.lines[1].AY,
 					this.lines[2].AY, this.lines[3].AY };
 
-			g2.fillPolygon(x_points, y_points, 4);
-			g2.setColor(Color.BLACK);
+			g2d.fillPolygon(x_points, y_points, 4);
+			g2d.setColor(Color.BLACK);
 
 			for (Line l : this.lines) {
-				g2.setStroke(new BasicStroke((float) (6 - 6 * li)));
-				g2.drawLine(l.AX, l.AY, l.BX, l.BY);
+				g2d.setStroke(new BasicStroke((float) (8 - 8 * li)));
+				g2d.drawLine(l.AX, l.AY, l.BX, l.BY);
 			}
 
 		}
@@ -585,14 +596,14 @@ public class Game extends JPanel {
 
 		public Paddle(int x, int y, int width, int height) {
 			super(x, y, width, height);
-			this.hsp = (int) (8 * spdf);
+			this.hsp = (int) ((2+ball_speed) * spdf);
 			this.light = 0;
 			this.mouse = 0;
 		}
 
 		private void moveTo(int dx) {
-			if (Math.abs(dx - this.x) > this.hsp) {
-				this.x += this.hsp * Math.signum((double) (dx - this.x));
+			if (Math.abs(dx - this.x) > this.hsp * time_factor) {
+				this.x += this.hsp * time_factor * Math.signum((double) (dx - this.x));
 			} else {
 				this.x = dx;
 				mouse = 0;
@@ -763,8 +774,8 @@ public class Game extends JPanel {
 			if (!this.shot) {
 				beep3();
 				this.shot = true;
-				this.xsp = ball_speed * spdf * Math.cos(Math.PI / 4);
-				this.ysp = -ball_speed * spdf * Math.sin(Math.PI / 4);
+				this.xsp = ball_speed * fps_factor * Math.cos(Math.PI / 4);
+				this.ysp = -ball_speed * fps_factor * Math.sin(Math.PI / 4);
 			}
 		}
 
@@ -839,18 +850,19 @@ public class Game extends JPanel {
 			}
 
 			Line tempL = null;
-			int mult = (int) dist(0, 0, this.xsp, this.ysp);
+			//double hsp = this.xsp * time_factor;
+			//double vsp = this.ysp * time_factor;
+			int mult = (int) ball_speed/2;
 
 			for (int i = 0; i < mult; i++) {
-				tempL = checkPlace(xsp / mult, ysp / mult);
+				tempL = checkPlace(xsp * time_factor / mult, ysp * time_factor / mult);
 				if (tempL != null) {
 					bounce(tempL);
 				} else {
-					x += xsp / mult;
-					y += ysp / mult;
+					x += xsp * time_factor / mult;
+					y += ysp * time_factor / mult;
 				}
 			}
-
 		}
 
 		public void render(Graphics2D g2) {
@@ -948,7 +960,7 @@ public class Game extends JPanel {
 			float[] coords = new float[6];
 			pi.currentSegment(coords);
 			double angle = (Math.atan2(coords[1] - cy, coords[0] - cx));
-			double wid = 8;
+			double wid = 10;
 
 			int tx1 = (int) (coords[0] + wid * Math.cos(angle + Math.PI / 2));
 			int ty1 = (int) (coords[1] + wid * Math.sin(angle + Math.PI / 2));
@@ -989,12 +1001,21 @@ public class Game extends JPanel {
 				long last_loop = System.nanoTime();
 
 				while (running) {
-
 					last_loop = System.nanoTime();
-
+					
+					
+					
+					if (collisionRectRect(ball.x - ball.radius, ball.y - ball.radius,
+							ball.x + ball.radius, ball.y + ball.radius, 0, 550, 800, 570)){
+						time_factor = 0.15;
+					}else{
+						time_factor = 1.0;
+					}
+					spdf = fps_factor * time_factor;
+					
 					update();
 					repaint();
-
+					
 					try {
 						Thread.sleep(Math.max(
 								fps_adjust
@@ -1003,7 +1024,6 @@ public class Game extends JPanel {
 					} catch (InterruptedException e) {
 						System.out.println("interrupted");
 					}
-					lastUpdateTime = System.currentTimeMillis();
 				}
 			}
 		}.start();
@@ -1033,15 +1053,15 @@ public class Game extends JPanel {
 		}
 	}
 
-	private void update_walls() {
+	private void updateWalls() {
 		if (left_wall > 0) {
-			left_wall -= 0.05;
+			left_wall -= 0.05 * spdf;
 		}
 		if (top_wall > 0) {
-			top_wall -= 0.05;
+			top_wall -= 0.05 * spdf;
 		}
 		if (right_wall > 0) {
-			right_wall -= 0.05;
+			right_wall -= 0.05 * spdf;
 		}
 
 		if (left_wall < 0) {
@@ -1068,7 +1088,7 @@ public class Game extends JPanel {
 
 	}
 
-	private void render_walls(Graphics2D g2) {
+	private void render(Graphics2D g2) {
 		g2.setStroke(new BasicStroke(6 + 2 * left_wall));
 		g2.setColor(blend(Color.GRAY, Color.WHITE, left_wall));
 		g2.drawLine(0, 0, 0, orig_scr_hgt);
@@ -1080,6 +1100,34 @@ public class Game extends JPanel {
 		g2.setStroke(new BasicStroke(6 + 2 * right_wall));
 		g2.setColor(blend(Color.GRAY, Color.WHITE, right_wall));
 		g2.drawLine(orig_scr_wid - 1, 0, orig_scr_wid - 1, orig_scr_hgt);
+	}
+	
+	private void renderHUD(Graphics2D g2) {
+		double li = Math.sin(scr_li * Math.PI / 2);
+		g2.setColor(blend(
+				getColorForSwitch((int) (1 + 6 * draw_score / 17000)),
+				Color.WHITE, li * 0.5 + 0.25));
+
+		double maxin = 20.0 * (double) draw_score / 17000;
+
+		if (score > draw_score) {
+			draw_score += ((score - draw_score) * 0.2);
+		} else if (score < Math.round(draw_score)) {
+			double dir = Math.random() * Math.PI * 2;
+			camx += 2 * Math.cos(dir);
+			camy += 2 * Math.sin(dir);
+			draw_score += ((score - draw_score) * 0.05);
+		}
+
+		g2.setFont(new Font("IMPACT", Font.BOLD, (int) (maxin + 22 + 10 * li)));
+		g2.drawString(
+				"SCORE: " + String.valueOf(10 * ((int) Math.round(draw_score))),
+				8, (int) (28 + maxin));
+
+		g2.setColor(Color.GRAY);
+		g2.setFont(new Font("IMPACT", Font.PLAIN, 12));
+		g2.drawString("FPS: " + String.valueOf(current_fps), 8,
+				(int) (48 + maxin));
 	}
 
 	public void update() {
@@ -1098,7 +1146,7 @@ public class Game extends JPanel {
 			d.update();
 		}
 
-		update_walls();
+		updateWalls();
 
 		sweep();
 
@@ -1131,6 +1179,7 @@ public class Game extends JPanel {
 		Graphics2D g2 = (Graphics2D) g;
 		g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING,
 				RenderingHints.VALUE_ANTIALIAS_ON);
+		
 
 		g2.scale(xscale, yscale);
 		g2.translate(camx, camy);
@@ -1138,7 +1187,7 @@ public class Game extends JPanel {
 		g2.fillRect((int) (-camx-2), (int) (-camy-2), (int) (orig_scr_wid+4),
 				(int) (orig_scr_hgt+4));
 
-		this.render_walls(g2);
+		this.render(g2);
 
 		for (DeadBlock d : dbList) {
 			d.render(g2);
@@ -1146,44 +1195,32 @@ public class Game extends JPanel {
 
 		ArrayList<Block> copyB = new ArrayList<Block>(blockList);
 		for (Block b : copyB) {
-			b.render(g2);
+			
+			if (b.hp == 1){
+				Graphics2D g2d = (Graphics2D) g2.create();
+				for (int i = 0; i < 5; i++){
+					g2d.translate(1-2*Math.random(), 1-2*Math.random());
+					b.render(g2d);
+				}
+				
+				
+			}else{
+				b.render(g2);
+			}
+			
+			
 		}
 
 		paddle.render(g2);
 
 		ball.render(g2);
 
-		for (Particle p : particleList) {
+		ArrayList<Particle> copyP = new ArrayList<Particle>(particleList);
+		for (Particle p : copyP) {
 			p.render(g2);
 		}
 
-		double li = Math.sin(scr_li * Math.PI / 2);
-		g2.setColor(blend(
-				getColorForSwitch((int) (1 + 6 * draw_score / 17000)),
-				Color.WHITE, li * 0.5 + 0.25));
-
-		double maxin = 20.0 * (double) draw_score / 17000;
-
-		// scr_li = (score - draw_score)/200;
-
-		if (score > draw_score) {
-			draw_score += ((score - draw_score) * 0.2);
-		} else if (score < Math.round(draw_score)) {
-			double dir = Math.random() * Math.PI * 2;
-			camx += 2 * Math.cos(dir);
-			camy += 2 * Math.sin(dir);
-			draw_score += ((score - draw_score) * 0.05);
-		}
-
-		g2.setFont(new Font("IMPACT", Font.BOLD, (int) (maxin + 22 + 10 * li)));
-		g2.drawString(
-				"SCORE: " + String.valueOf(10 * ((int) Math.round(draw_score))),
-				8, (int) (28 + maxin));
-
-		g2.setColor(Color.GRAY);
-		g2.setFont(new Font("IMPACT", Font.PLAIN, 12));
-		g2.drawString("FPS: " + String.valueOf(current_fps), 8,
-				(int) (48 + maxin));
+		this.renderHUD(g2);
 
 	}
 
