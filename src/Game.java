@@ -45,6 +45,7 @@ public class Game extends JPanel {
 	private double scr_li = 0.0;
 	private int lives = 3;
 	private int room = 0;
+	private boolean room_created = false;
 	
 	private boolean vk_right = false;
 	private boolean vk_left = false;
@@ -62,7 +63,61 @@ public class Game extends JPanel {
 	Color c_orange = new Color(255, 128, 0);
 	Color c_purple = new Color(128, 0, 128);
 	Color c_blue = new Color(0, 0, 255);
-
+	
+	final Thread game_over;
+	
+	final Thread game_loop = new Thread() {
+			public void run() {
+				long last_loop = System.nanoTime();
+				
+				blockList = new ArrayList<Block>();
+				particleList = new ArrayList<Particle>();
+				dbList = new ArrayList<DeadBlock>();
+				
+				buildLevel();
+				room_created = true;
+				
+				while (running) {
+					last_loop = System.nanoTime();
+					
+					
+					
+					if (collisionRectRect(ball.x - ball.radius, ball.y - ball.radius,
+							ball.x + ball.radius, ball.y + ball.radius, 0, 550, 800, 570)){
+						time_factor = 0.15;
+					}else{
+						time_factor = 1.0;
+					}
+					spdf = fps_factor * time_factor;
+					
+					update();
+					repaint();
+					
+					if (lives <= 0){
+						game_over.start();
+						room_created = false;
+						room = 2;
+						try {
+							Thread.currentThread().wait();
+						} catch (InterruptedException e) {
+							// TODO Auto-generated catch block
+							e.printStackTrace();
+						}
+						return;
+					}
+					
+					try {
+						Thread.sleep(Math.max(
+								fps_adjust
+										+ (last_loop - System.nanoTime() + optimal_time)
+										/ 1000000, 1));
+					} catch (InterruptedException e) {
+						System.out.println("interrupted");
+					}
+				}
+			}
+		};
+	
 	public static synchronized void playSound(final String url, float p,
 			float v, int reserve) {
 		new Thread(new Runnable() {
@@ -847,11 +902,10 @@ public class Game extends JPanel {
 				this.shot = false;
 				score /= 2;
 				beepDead();
+				lives--;
 			}
 
 			Line tempL = null;
-			//double hsp = this.xsp * time_factor;
-			//double vsp = this.ysp * time_factor;
 			int mult = (int) ball_speed/2;
 
 			for (int i = 0; i < mult; i++) {
@@ -866,7 +920,6 @@ public class Game extends JPanel {
 		}
 
 		public void render(Graphics2D g2) {
-
 			if (!shot) {
 				g2.setColor(blend(Color.LIGHT_GRAY, this.col, this.light));
 
@@ -906,31 +959,7 @@ public class Game extends JPanel {
 		}
 	}
 
-	public Game() {
-
-		/*
-		 * REMOVE CURSOR code BufferedImage cursorImg = new BufferedImage(16,
-		 * 16, BufferedImage.TYPE_INT_ARGB); Cursor blankCursor =
-		 * Toolkit.getDefaultToolkit().createCustomCursor( cursorImg, new
-		 * Point(0, 0), "blank cursor"); this.setCursor(blankCursor);
-		 */
-
-		this.setFocusable(true);
-
-		MouseAdapter ml = new ML();
-		this.addMouseListener(ml);
-		this.addMouseMotionListener(ml);
-		this.addKeyListener(new KL());
-		this.addComponentListener(new CL());
-
-		blockList = new ArrayList<Block>();
-		particleList = new ArrayList<Particle>();
-		dbList = new ArrayList<DeadBlock>();
-
-		Timer t = new Timer(1000, updateFPS);
-		t.setInitialDelay(0);
-		t.start();
-
+	private void buildLevel(){
 		ball = new Ball(0, 0);
 		paddle = new Paddle(256, 540, 64, 8);
 
@@ -995,39 +1024,85 @@ public class Game extends JPanel {
 			prev = block;
 			pi.next();
 		}
+	}
+	
+	public Game() {
 
-		new Thread() {
+		/*
+		 * REMOVE CURSOR code BufferedImage cursorImg = new BufferedImage(16,
+		 * 16, BufferedImage.TYPE_INT_ARGB); Cursor blankCursor =
+		 * Toolkit.getDefaultToolkit().createCustomCursor( cursorImg, new
+		 * Point(0, 0), "blank cursor"); this.setCursor(blankCursor);
+		 */
+
+		this.setFocusable(true);
+
+		MouseAdapter ml = new ML();
+		this.addMouseListener(ml);
+		this.addMouseMotionListener(ml);
+		this.addKeyListener(new KL());
+		this.addComponentListener(new CL());
+
+		
+
+		Timer t = new Timer(1000, updateFPS);
+		t.setInitialDelay(0);
+		t.start();
+		
+		
+		
+		game_over = new Thread() {
 			public void run() {
-				long last_loop = System.nanoTime();
-
 				while (running) {
-					last_loop = System.nanoTime();
-					
-					
-					
-					if (collisionRectRect(ball.x - ball.radius, ball.y - ball.radius,
-							ball.x + ball.radius, ball.y + ball.radius, 0, 550, 800, 570)){
-						time_factor = 0.15;
-					}else{
-						time_factor = 1.0;
-					}
-					spdf = fps_factor * time_factor;
-					
-					update();
 					repaint();
 					
+					if (room != 2){
+						score = 0;
+						blockList = new ArrayList<Block>();
+						particleList = new ArrayList<Particle>();
+						dbList = new ArrayList<DeadBlock>();
+						
+						buildLevel();
+						room_created = true;
+						
+						game_loop.notify();
+						Thread.currentThread().interrupt();
+						return;
+					}
+					
 					try {
-						Thread.sleep(Math.max(
-								fps_adjust
-										+ (last_loop - System.nanoTime() + optimal_time)
-										/ 1000000, 1));
+						Thread.sleep(500);
 					} catch (InterruptedException e) {
 						System.out.println("interrupted");
 					}
 				}
+				
+			}
+		};
+		
+		new Thread() {
+			public void run() {
+				while (running) {
+					repaint();
+					
+					if (room != 0){
+						
+						game_loop.start();
+						Thread.currentThread().interrupt();
+						return;
+					}
+					
+					try {
+						Thread.sleep(500);
+					} catch (InterruptedException e) {
+						System.out.println("interrupted");
+					}
+				}
+				
 			}
 		}.start();
-
+		
+		
 	}
 
 	// remove dead entities
@@ -1128,6 +1203,22 @@ public class Game extends JPanel {
 		g2.setFont(new Font("IMPACT", Font.PLAIN, 12));
 		g2.drawString("FPS: " + String.valueOf(current_fps), 8,
 				(int) (48 + maxin));
+		
+		int xx = orig_scr_wid - 12 - 10;
+		int yy = 18;
+		
+		g2.setColor(Color.WHITE);
+		g2.setStroke(new BasicStroke(2));
+				
+		for (int i = 0; i < 3; i++){
+			g2.drawOval(xx-i*22, yy, 10, 10);
+			if (i+lives >= 3){
+				g2.fillOval(xx-i*22, yy, 10, 10);
+			}
+		}
+		
+		
+		
 	}
 
 	public void update() {
@@ -1186,10 +1277,83 @@ public class Game extends JPanel {
 		g2.setColor(Color.BLACK);
 		g2.fillRect((int) (-camx-2), (int) (-camy-2), (int) (orig_scr_wid+4),
 				(int) (orig_scr_hgt+4));
+		
+		if (room == 0){
+			g2.setColor(Color.WHITE);
+			String text = "Hello there";
+			Font font = new Font("IMPACT", Font.BOLD, 18);
+			FontMetrics metrics = g.getFontMetrics(font);
+			g2.setFont(font);
+			
+			int x = (orig_scr_wid - metrics.stringWidth(text)) / 2;
+			int y = (orig_scr_hgt - metrics.getHeight()) / 2;
+			
+			int c = 1;
+			g2.setColor(blend(this.getColorForSwitch(c++),Color.WHITE,1-0.5));
+			g2.drawString("Shrenil Patel", 6, 16);
+			g2.setColor(blend(this.getColorForSwitch(c++),Color.WHITE,1-0.5));
+			g2.drawString("s222pate", 6, 16+20);
+			g2.setColor(blend(this.getColorForSwitch(c++),Color.WHITE,1-0.5));
+			g2.drawString("20463962", 6, 16+2*20);
+			
+			String[] str = {
+			"BREAKOUT",
+			"",
+			"Use arrow keys <Left> & <Right> OR mouse to move paddle",
+			"Use left mouse button OR <Space> to launch ball",
+			"",
+			"Press <Space> to start"
+			};
+			int start = y-20*str.length/2;
+			for (String s : str){
+				if (s != "")
+					g2.setColor(blend(this.getColorForSwitch(c++),Color.WHITE,1-0.5));
+				
+				x = (orig_scr_wid - metrics.stringWidth(s)) / 2;
+				g2.drawString(s, x, start);
+				start += 20;
+			}
+			return;
+		} else if (room == 2){
+			g2.setColor(Color.WHITE);
+			String text = "SCORE: " + String.valueOf(score*20);
+			Font font = new Font("IMPACT", Font.BOLD, 28);
+			Font font2 = new Font("IMPACT", Font.BOLD, 18);
+			FontMetrics metrics = g.getFontMetrics(font);
+			g2.setFont(font);
+			
+			int x = (orig_scr_wid - metrics.stringWidth(text)) / 2;
+			int y = (orig_scr_hgt - metrics.getHeight()) / 2;
+			
+			int c = 1;
+			g2.setColor(blend(this.getColorForSwitch(c++),Color.WHITE,1-0.5));
+			g2.drawString(text, x, y);
+			
+			g2.setFont(font2);
+			metrics = g.getFontMetrics(font2);
+			
+			String[] str = {
+			"Press <Space> to Try Again!"
+			};
+			int start = y+64;
+			for (String s : str){
+				if (s != "")
+					g2.setColor(blend(this.getColorForSwitch(c++),Color.WHITE,1-0.5));
+				
+				x = (orig_scr_wid - metrics.stringWidth(s)) / 2;
+				g2.drawString(s, x, start);
+				start += 20;
+			}
+			return;
+		}
+		
+		if (!room_created)
+			return;
 
 		this.render(g2);
 
-		for (DeadBlock d : dbList) {
+		ArrayList<DeadBlock> copyD = new ArrayList<DeadBlock>(dbList);
+		for (DeadBlock d : copyD) {
 			d.render(g2);
 		}
 
@@ -1235,19 +1399,21 @@ public class Game extends JPanel {
 
 	public class ML extends MouseAdapter {
 		public void mouseMoved(MouseEvent e) {
-			pos_x = (int) (e.getX() / xscale);
-			pos_y = (int) (e.getY() / yscale);
-			paddle.mouse = (int) (60 / spdf);
+			if (room == 1 && room_created){
+				pos_x = (int) (e.getX() / xscale);
+				pos_y = (int) (e.getY() / yscale);
+				paddle.mouse = (int) (60 / spdf);
+			}
 		}
 
 		public void mousePressed(MouseEvent e) {
-			if (e.getButton() == MouseEvent.BUTTON1) {
+			if (e.getButton() == MouseEvent.BUTTON1 && room == 1 && room_created) {
 				ball.launch();
 			}
 		}
 
 		public void mouseClicked(MouseEvent e) {
-			if (e.getButton() == MouseEvent.BUTTON1) {
+			if (e.getButton() == MouseEvent.BUTTON1 && room == 1 && room_created) {
 				ball.launch();
 			}
 		}
@@ -1262,7 +1428,15 @@ public class Game extends JPanel {
 			} else if (key == KeyEvent.VK_RIGHT) {
 				vk_right = true;
 			} else if (key == KeyEvent.VK_SPACE) {
-				ball.launch();
+				
+				if (room == 0){
+					room = 1;
+				}else if (room == 1){
+					ball.launch();
+				}else if (room == 2){
+					room = 1;
+				}
+				
 			}
 
 		}
