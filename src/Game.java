@@ -1,9 +1,6 @@
 import java.awt.*;
 import java.awt.event.*;
 import java.awt.geom.*;
-import java.awt.image.BufferedImage;
-import java.awt.image.DataBufferInt;
-import java.io.File;
 import java.io.IOException;
 import java.util.*;
 
@@ -16,18 +13,18 @@ public class Game extends JPanel {
 	boolean running = true;
 	Thread animator;
 
-	int totalFrameCount = 0;
+	int total_frame_count = 0;
 	int current_fps = 0;
 	int fps_adjust = 0;
 
-	final int target_fps = 60;
-	final int ball_speed = 8;
-
-	final double fps_factor = 60.0 / target_fps;
+	static int target_fps = 60;
+	static int ball_speed = 8;
+	static double fps_factor = 60.0 / target_fps;
+	static long optimal_time = 1000000000 / target_fps;
+	
 	private double time_factor = 1.0;
 	private double spdf = fps_factor * time_factor;
-
-	final long optimal_time = 1000000000 / target_fps;
+	
 	final int orig_scr_wid = 800;
 	final int orig_scr_hgt = 600;
 	final double force = 1;
@@ -63,60 +60,6 @@ public class Game extends JPanel {
 	Color c_orange = new Color(255, 128, 0);
 	Color c_purple = new Color(128, 0, 128);
 	Color c_blue = new Color(0, 0, 255);
-	
-	final Thread game_over;
-	
-	final Thread game_loop = new Thread() {
-			public void run() {
-				long last_loop = System.nanoTime();
-				
-				blockList = new ArrayList<Block>();
-				particleList = new ArrayList<Particle>();
-				dbList = new ArrayList<DeadBlock>();
-				
-				buildLevel();
-				room_created = true;
-				
-				while (running) {
-					last_loop = System.nanoTime();
-					
-					
-					
-					if (collisionRectRect(ball.x - ball.radius, ball.y - ball.radius,
-							ball.x + ball.radius, ball.y + ball.radius, 0, 550, 800, 570)){
-						time_factor = 0.15;
-					}else{
-						time_factor = 1.0;
-					}
-					spdf = fps_factor * time_factor;
-					
-					update();
-					repaint();
-					
-					if (lives <= 0){
-						game_over.start();
-						room_created = false;
-						room = 2;
-						try {
-							Thread.currentThread().wait();
-						} catch (InterruptedException e) {
-							// TODO Auto-generated catch block
-							e.printStackTrace();
-						}
-						return;
-					}
-					
-					try {
-						Thread.sleep(Math.max(
-								fps_adjust
-										+ (last_loop - System.nanoTime() + optimal_time)
-										/ 1000000, 1));
-					} catch (InterruptedException e) {
-						System.out.println("interrupted");
-					}
-				}
-			}
-		};
 	
 	public static synchronized void playSound(final String url, float p,
 			float v, int reserve) {
@@ -204,13 +147,13 @@ public class Game extends JPanel {
 	ActionListener updateFPS = new ActionListener() {
 		@Override
 		public void actionPerformed(ActionEvent event) {
-			current_fps = totalFrameCount;
+			current_fps = total_frame_count;
 			if (current_fps + 1 < target_fps) {
 				fps_adjust--;
 			} else if (current_fps - 1 > target_fps) {
 				fps_adjust++;
 			}
-			totalFrameCount = 0;
+			total_frame_count = 0;
 		}
 	};
 
@@ -900,9 +843,10 @@ public class Game extends JPanel {
 				this.xsp = 0;
 				this.ysp = 0;
 				this.shot = false;
-				score /= 2;
-				beepDead();
 				lives--;
+				beepDead();
+				if (lives > 0)
+					score /= 2;
 			}
 
 			Line tempL = null;
@@ -1049,58 +993,66 @@ public class Game extends JPanel {
 		t.setInitialDelay(0);
 		t.start();
 		
-		
-		
-		game_over = new Thread() {
+		Thread game_loop = new Thread() {
 			public void run() {
+				
+				long last_loop = System.nanoTime();
+				
+				
+				
+				
 				while (running) {
-					repaint();
 					
-					if (room != 2){
-						score = 0;
-						blockList = new ArrayList<Block>();
-						particleList = new ArrayList<Particle>();
-						dbList = new ArrayList<DeadBlock>();
+					if (room == 1){
 						
-						buildLevel();
-						room_created = true;
+						if (room_created == false){
+							blockList = new ArrayList<Block>();
+							particleList = new ArrayList<Particle>();
+							dbList = new ArrayList<DeadBlock>();
+							
+							buildLevel();
+							room_created = true;
+						}
 						
-						game_loop.notify();
-						Thread.currentThread().interrupt();
-						return;
+						last_loop = System.nanoTime();
+						
+						if (collisionRectRect(ball.x - ball.radius, ball.y - ball.radius,
+								ball.x + ball.radius, ball.y + ball.radius, 0, 550, 800, 570)){
+							time_factor = 0.15;
+						}else{
+							time_factor = 1.0;
+						}
+						spdf = fps_factor * time_factor;
+						
+						update();
+						repaint();
+						
+						if (lives <= 0){
+							room_created = false;
+							room = 2;
+						}
+						
+					}else if (room == 0){
+						repaint();
+						
+					}else if (room == 2){
+						repaint();
 					}
 					
 					try {
-						Thread.sleep(500);
+						Thread.sleep(Math.max(
+								fps_adjust
+										+ (last_loop - System.nanoTime() + optimal_time)
+										/ 1000000, 1));
 					} catch (InterruptedException e) {
 						System.out.println("interrupted");
 					}
 				}
+				
 				
 			}
 		};
-		
-		new Thread() {
-			public void run() {
-				while (running) {
-					repaint();
-					
-					if (room != 0){
-						
-						game_loop.start();
-						Thread.currentThread().interrupt();
-						return;
-					}
-					
-					try {
-						Thread.sleep(500);
-					} catch (InterruptedException e) {
-						System.out.println("interrupted");
-					}
-				}
-				
-			}
-		}.start();
+		game_loop.start();
 		
 		
 	}
@@ -1213,7 +1165,13 @@ public class Game extends JPanel {
 		for (int i = 0; i < 3; i++){
 			g2.drawOval(xx-i*22, yy, 10, 10);
 			if (i+lives >= 3){
-				g2.fillOval(xx-i*22, yy, 10, 10);
+				if (lives == 1){
+					if (total_frame_count % (target_fps/2) > target_fps/6)
+						g2.fillOval(xx-i*22, yy, 10, 10);
+				}else{
+					g2.fillOval(xx-i*22, yy, 10, 10);
+				}
+				
 			}
 		}
 		
@@ -1241,7 +1199,7 @@ public class Game extends JPanel {
 
 		sweep();
 
-		totalFrameCount++;
+		total_frame_count++;
 	}
 
 	private Color getColorForSwitch(int sw) {
@@ -1301,6 +1259,7 @@ public class Game extends JPanel {
 			"",
 			"Use arrow keys <Left> & <Right> OR mouse to move paddle",
 			"Use left mouse button OR <Space> to launch ball",
+			"<Esc> to quit game",
 			"",
 			"Press <Space> to start"
 			};
@@ -1316,7 +1275,7 @@ public class Game extends JPanel {
 			return;
 		} else if (room == 2){
 			g2.setColor(Color.WHITE);
-			String text = "SCORE: " + String.valueOf(score*20);
+			String text = "SCORE: " + String.valueOf(Math.round(score)*10);
 			Font font = new Font("IMPACT", Font.BOLD, 28);
 			Font font2 = new Font("IMPACT", Font.BOLD, 18);
 			FontMetrics metrics = g.getFontMetrics(font);
@@ -1347,8 +1306,9 @@ public class Game extends JPanel {
 			return;
 		}
 		
-		if (!room_created)
+		if (!room_created){
 			return;
+		}
 
 		this.render(g2);
 
@@ -1379,6 +1339,10 @@ public class Game extends JPanel {
 
 		ball.render(g2);
 
+		if (!room_created){
+			return;
+		}
+		
 		ArrayList<Particle> copyP = new ArrayList<Particle>(particleList);
 		for (Particle p : copyP) {
 			p.render(g2);
@@ -1389,6 +1353,22 @@ public class Game extends JPanel {
 	}
 
 	public static void main(String args[]) {
+		target_fps = 60;
+		ball_speed = 8;
+		
+		if (args.length > 0) {
+		    try {
+		    	target_fps = Integer.parseInt(args[0]);
+		    	ball_speed = Integer.parseInt(args[1]);
+		    } catch (NumberFormatException e) {
+		        System.err.println("Argument" + args[0] + " must be an integer.");
+		        System.err.println("Argument" + args[1] + " must be an integer.");
+		    }
+		}
+		
+		fps_factor = 60.0 / target_fps;
+		optimal_time = 1000000000 / target_fps;
+		
 		JFrame window = new JFrame("Breakout");
 		window.setLocationByPlatform(true);
 		window.setSize(800, 600);
@@ -1431,10 +1411,21 @@ public class Game extends JPanel {
 				
 				if (room == 0){
 					room = 1;
+					fps_adjust = 0;
 				}else if (room == 1){
 					ball.launch();
 				}else if (room == 2){
+					score = 0;
+					draw_score = 0;
+					blockList = new ArrayList<Block>();
+					particleList = new ArrayList<Particle>();
+					dbList = new ArrayList<DeadBlock>();
+					
+					buildLevel();
+					room_created = true;
+					lives = 3;
 					room = 1;
+					fps_adjust = 0;
 				}
 				
 			}
@@ -1448,6 +1439,8 @@ public class Game extends JPanel {
 				vk_left = false;
 			} else if (key == KeyEvent.VK_RIGHT) {
 				vk_right = false;
+			} else if (key == KeyEvent.VK_ESCAPE){
+				System.exit(0);
 			}
 		}
 	}
